@@ -5,7 +5,7 @@ const PORT = process.env.PORT || 4000;
 app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.json({ message: 'Hola desde el backend Express' });
+  res.json({ message: 'Hola desde el backend Express ' });
 });
 
 app.get('/api/ping', (req, res) => {
