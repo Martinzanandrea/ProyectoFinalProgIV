@@ -1,0 +1,19 @@
+{
+  "name": "proyecto-final-back",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Backend Express para Proyecto Final ProgIV",
+  "main": "app.js",
+  "scripts": {
+    "dev": "nodemon app.js",
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  },
+  "author": "",
+  "license": "ISC"
+}
