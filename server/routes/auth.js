@@ -1,14 +1,33 @@
+// ============================================================
+// RUTAS DE AUTENTICACIÓN
+// ============================================================
+
+// Módulos necesarios
 const express = require('express');
 const router = express.Router();
-const pool = require('../db');
-const crypto = require('crypto');
+const pool = require('../db');  // Conexión a PostgreSQL
+const crypto = require('crypto');  // Para hashear contraseñas
 
-// Función para hashear contraseña con SHA-256
+// ============================================================
+// FUNCIÓN: hashear contraseña
+// ============================================================
+// Convierte "miPass123" en algo como "a1b2c3d4..."
+// Por seguridad, las contraseñas no se guardan en texto plano
+// ============================================================
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
 
-// POST /api/auth/login
+// ============================================================
+// LOGIN - Iniciar sesión
+// ============================================================
+// Recibe: { usuario, contrasenia }
+// Proceso:
+//   1. Hashea la contraseña recibida
+//   2. Busca en la DB el usuario con esa contraseña hasheada
+//   3. Verifica que esté activo (activo = 1)
+// Devuelve: datos del usuario o error
+// ============================================================
 router.post('/login', async (req, res) => {
   const { usuario, contrasenia } = req.body;
 
@@ -17,9 +36,10 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    // Hashear la contraseña antes de buscar
+    // COMPLEJO: Hashear contraseña para comparar con la DB
     const hashedPassword = hashPassword(contrasenia);
     
+    // Busca usuario con nombre y contraseña hasheada
     const result = await pool.query(
       'SELECT id_usuario, nombre_usuario, nombre FROM usuarios WHERE nombre_usuario = $1 AND contrasenia = $2 AND activo = 1',
       [usuario, hashedPassword]
@@ -42,16 +62,25 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /api/auth/register - Registro de nuevos usuarios
+// ============================================================
+// REGISTER - Registrar nuevo usuario
+// ============================================================
+// Recibe: { usuario, contrasenia, nombre, apellido }
+// Proceso:
+//   1. Verifica que el usuario no exista
+//   2. Hashea la contraseña
+//   3. Inserta en la DB con activo = 1
+// Devuelve: datos del nuevo usuario o error
+// ============================================================
 router.post('/register', async (req, res) => {
   const { usuario, contrasenia, nombre, apellido } = req.body;
 
   if (!usuario || !contrasenia || !nombre || !apellido) {
-    return res.status(400).json({ error: 'Usuario, contraseña, nombre y apellido son requeridos' });
+    return res.status(400).json({ error: 'Todos los campos son requeridos' });
   }
 
   try {
-    // Verificar si el usuario ya existe
+    // Verifica si el usuario ya existe
     const existingUser = await pool.query(
       'SELECT id_usuario FROM usuarios WHERE nombre_usuario = $1',
       [usuario]
@@ -61,10 +90,10 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'El usuario ya existe' });
     }
 
-    // Hashear la contraseña antes de guardar
+    // COMPLEJO: Hashea la contraseña antes de guardar
     const hashedPassword = hashPassword(contrasenia);
 
-    // Insertar nuevo usuario
+    // Inserta nuevo usuario
     const result = await pool.query(
       'INSERT INTO usuarios (nombre_usuario, contrasenia, nombre, apellido, activo) VALUES ($1, $2, $3, $4, 1) RETURNING id_usuario, nombre_usuario, nombre, apellido',
       [usuario, hashedPassword, nombre, apellido]
