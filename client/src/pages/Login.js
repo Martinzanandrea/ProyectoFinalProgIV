@@ -8,6 +8,7 @@ const Login = ({ onLogin }) => {
   const [usuario, setUsuario] = useState('');
   const [contrasenia, setContrasenia] = useState('');
   const [nombre, setNombre] = useState('');
+  const [apellido, setApellido] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -18,13 +19,14 @@ const Login = ({ onLogin }) => {
 
     try {
       if (isRegister) {
-        const response = await register(usuario, contrasenia, nombre);
+        const response = await register(usuario, contrasenia, nombre, apellido);
         if (response.data.success) {
           setIsRegister(false);
           setError('Usuario registrado exitosamente. Ahora puedes iniciar sesión.');
           setUsuario('');
           setContrasenia('');
           setNombre('');
+          setApellido('');
         }
       } else {
         const response = await login(usuario, contrasenia);
@@ -46,17 +48,30 @@ const Login = ({ onLogin }) => {
       {error && <p style={{ color: error.includes('exitosamente') ? 'green' : 'red' }}>{error}</p>}
       <form onSubmit={handleSubmit}>
         {isRegister && (
-          <div style={{ marginBottom: 15 }}>
-            <label>Nombre</label>
-            <br />
-            <input 
-              type="text" 
-              name="nombre" 
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              style={{ width: '100%', padding: 8, marginTop: 5 }} 
-            />
-          </div>
+          <>
+            <div style={{ marginBottom: 15 }}>
+              <label>Nombre</label>
+              <br />
+              <input 
+                type="text" 
+                name="nombre" 
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                style={{ width: '100%', padding: 8, marginTop: 5 }} 
+              />
+            </div>
+            <div style={{ marginBottom: 15 }}>
+              <label>Apellido</label>
+              <br />
+              <input 
+                type="text" 
+                name="apellido" 
+                value={apellido}
+                onChange={(e) => setApellido(e.target.value)}
+                style={{ width: '100%', padding: 8, marginTop: 5 }} 
+              />
+            </div>
+          </>
         )}
         <div style={{ marginBottom: 15 }}>
           <label>Usuario</label>

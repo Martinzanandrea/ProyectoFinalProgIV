@@ -13,8 +13,8 @@ const api = axios.create({
 export const login = (usuario, contrasenia) => 
   api.post('/auth/login', { usuario, contrasenia });
 
-export const register = (usuario, contrasenia, nombre) => 
-  api.post('/auth/register', { usuario, contrasenia, nombre });
+export const register = (usuario, contrasenia, nombre, apellido) => 
+  api.post('/auth/register', { usuario, contrasenia, nombre, apellido });
 
 // Estudiantes
 export const getEstudiantes = (page, limit, search) => 
