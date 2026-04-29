@@ -18,6 +18,20 @@ app.get('/api/ping', async (req, res) => {
   }
 });
 
+// Endpoint para verificar las tablas disponibles
+app.get('/api/tables', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `);
+    res.json({ tables: result.rows.map(r => r.table_name) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/estudiantes', require('./routes/estudiantes'));
 app.use('/api/cursos', require('./routes/cursos'));
