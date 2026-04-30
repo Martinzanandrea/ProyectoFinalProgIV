@@ -18,19 +18,19 @@ router.get('/', async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    let query = 'SELECT * FROM estudiantes';
+    let query = 'SELECT id_estudiante as id, documento as dni, apellido, nombres as nombre, email, fecha_nacimiento, activo FROM estudiantes';
     let countQuery = 'SELECT COUNT(*) FROM estudiantes';
     let params = [];
     let countParams = [];
 
     if (search) {
-      query += ' WHERE nombre ILIKE $1 OR apellido ILIKE $1 OR dni ILIKE $1';
-      countQuery += ' WHERE nombre ILIKE $1 OR apellido ILIKE $1 OR dni ILIKE $1';
+      query += ' WHERE nombres ILIKE $1 OR apellido ILIKE $1 OR documento ILIKE $1';
+      countQuery += ' WHERE nombres ILIKE $1 OR apellido ILIKE $1 OR documento ILIKE $1';
       params.push(`%${search}%`);
       countParams.push(`%${search}%`);
     }
 
-    query += ' ORDER BY id LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
+    query += ' ORDER BY id_estudiante LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
     params.push(limit, offset);
 
     const result = await pool.query(query, params);
@@ -61,8 +61,8 @@ router.post('/', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'INSERT INTO estudiantes (nombre, apellido, dni, email, telefono) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [nombre, apellido, dni, email, telefono]
+      'INSERT INTO estudiantes (nombres, apellido, documento, email, fecha_nacimiento) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [nombre, apellido, dni, email, null]
     );
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
@@ -73,7 +73,7 @@ router.post('/', async (req, res) => {
 // GET /api/estudiantes/:id - Ver estudiante
 router.get('/:id', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM estudiantes WHERE id = $1', [req.params.id]);
+    const result = await pool.query('SELECT id_estudiante as id, documento as dni, apellido, nombres as nombre, email, fecha_nacimiento, activo FROM estudiantes WHERE id_estudiante = $1', [req.params.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Estudiante no encontrado' });
     }
@@ -89,8 +89,8 @@ router.put('/:id', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'UPDATE estudiantes SET nombre = $1, apellido = $2, dni = $3, email = $4, telefono = $5 WHERE id = $6 RETURNING *',
-      [nombre, apellido, dni, email, telefono, req.params.id]
+      'UPDATE estudiantes SET nombres = $1, apellido = $2, documento = $3, email = $4 WHERE id_estudiante = $5 RETURNING *',
+      [nombre, apellido, dni, email, req.params.id]
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Estudiante no encontrado' });
@@ -104,7 +104,7 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/estudiantes/:id - Eliminar estudiante
 router.delete('/:id', async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM estudiantes WHERE id = $1 RETURNING *', [req.params.id]);
+    const result = await pool.query('DELETE FROM estudiantes WHERE id_estudiante = $1 RETURNING *', [req.params.id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Estudiante no encontrado' });
     }

@@ -25,7 +25,7 @@ const Cursos = () => {
 
   useEffect(() => {
     fetchCursos(page, search);
-  }, [page]);
+  }, [page, search]);
 
   const handleSearch = (e) => {
     e.preventDefault();
