@@ -18,7 +18,7 @@ export const register = (usuario, contrasenia, nombre, apellido) =>
 
 // Estudiantes
 export const getEstudiantes = (page, limit, search) => 
-  api.get(`/estudiantes?page=${page}&limit=${limit}&search=${search}`);
+  api.get(`/estudiantes?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);
 
 export const getEstudiante = (id) => 
   api.get(`/estudiantes/${id}`);
@@ -37,7 +37,7 @@ export const getTotalEstudiantes = () =>
 
 // Cursos
 export const getCursos = (page, limit, search) => 
-  api.get(`/cursos?page=${page}&limit=${limit}&search=${search}`);
+  api.get(`/cursos?page=${page}&limit=${limit}&search=${encodeURIComponent(search)}`);
 
 export const getCurso = (id) => 
   api.get(`/cursos/${id}`);
@@ -45,11 +45,12 @@ export const getCurso = (id) =>
 export const createCurso = (data) => 
   api.post('/cursos', data);
 
-export const updateCurso = (id, data) => 
-  api.put(`/cursos/${id}`, data);
+export const updateCurso = (id_curso, data) => 
+  console.log('Updating curso with id:', id_curso, data) ||
+  api.put(`/cursos/${id_curso}`, data);
 
-export const deleteCurso = (id) => 
-  api.delete(`/cursos/${id}`);
+export const deleteCurso = (id_curso) => 
+  api.delete(`/cursos/${id_curso}`);
 
 export const getCursosActivos = () => 
   api.get('/cursos/activos');
@@ -57,8 +58,8 @@ export const getCursosActivos = () =>
 export const getTotalCursos = () => 
   api.get('/cursos/totales');
 
-export const getDiplomaCurso = (id) => 
-  api.get(`/cursos/${id}/diploma`);
+export const getDiplomaCurso = (id_curso) => 
+  api.get(`/cursos/${id_curso}/diploma`);
 
 // Inscripciones
 export const getInscripciones = (page, limit) => 

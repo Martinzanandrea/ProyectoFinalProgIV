@@ -1,27 +1,36 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const pool = require('../db');
+const pool = require("../db");
+const validateCurso = require("../middlewares/validateCurso");
 
 // GET /api/cursos - Listado con búsqueda y paginación
-router.get('/', async (req, res) => {
-  const { page = 1, limit = 10, search = '' } = req.query;
-  const offset = (page - 1) * limit;
+router.get("/", async (req, res) => {
+  const { page = 1, limit = 10, search = "" } = req.query;
+  const pageNum = parseInt(page, 10) || 1;
+  const limitNum = parseInt(limit, 10) || 10;
+  const offset = (pageNum - 1) * limitNum;
 
   try {
-    let query = 'SELECT * FROM cursos';
-    let countQuery = 'SELECT COUNT(*) FROM cursos';
+    let query =
+      "SELECT id_curso, nombre, descripcion,fecha_inicio,cantidad_horas,inscriptos_max, id_curso_estado FROM cursos WHERE id_curso_estado = 1 OR id_curso_estado = 2 OR id_curso_estado = 3";
+    let countQuery =
+      "SELECT COUNT(*) FROM cursos WHERE id_curso_estado = 1 OR id_curso_estado = 2 OR id_curso_estado = 3";
     let params = [];
     let countParams = [];
 
     if (search) {
-      query += ' WHERE nombre ILIKE $1 OR descripcion ILIKE $1';
-      countQuery += ' WHERE nombre ILIKE $1 OR descripcion ILIKE $1';
+      query += " AND (nombre ILIKE $1 OR descripcion ILIKE $1)";
+      countQuery += " AND (nombre ILIKE $1 OR descripcion ILIKE $1)";
       params.push(`%${search}%`);
       countParams.push(`%${search}%`);
     }
 
-    query += ' ORDER BY id LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2);
-    params.push(limit, offset);
+    query +=
+      " ORDER BY id_curso LIMIT $" +
+      (params.length + 1) +
+      " OFFSET $" +
+      (params.length + 2);
+    params.push(limitNum, offset);
 
     const result = await pool.query(query, params);
     const countResult = await pool.query(countQuery, countParams);
@@ -30,11 +39,11 @@ router.get('/', async (req, res) => {
     res.json({
       data: result.rows,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limit)
-      }
+        totalPages: Math.ceil(total / limitNum),
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -42,10 +51,10 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/cursos/activos - Cursos activos para el dashboard
-router.get('/activos', async (req, res) => {
+router.get("/activos", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT * FROM cursos WHERE estado = 'activo' ORDER BY id LIMIT 5"
+      "SELECT * FROM cursos WHERE id_curso_estado = 1 OR id_curso_estado = 2 OR id_curso_estado = 3 ORDER BY id_curso LIMIT 5",
     );
     res.json({ data: result.rows });
   } catch (err) {
@@ -54,9 +63,9 @@ router.get('/activos', async (req, res) => {
 });
 
 // GET /api/cursos/totales - Totales para el dashboard
-router.get('/totales', async (req, res) => {
+router.get("/totales", async (req, res) => {
   try {
-    const result = await pool.query('SELECT COUNT(*) as total FROM cursos');
+    const result = await pool.query("SELECT COUNT(*) as total FROM cursos");
     res.json({ total: parseInt(result.rows[0].total) });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -64,17 +73,29 @@ router.get('/totales', async (req, res) => {
 });
 
 // POST /api/cursos - Crear curso
-router.post('/', async (req, res) => {
-  const { nombre, descripcion, inscriptos_max, estado } = req.body;
-
-  if (!nombre) {
-    return res.status(400).json({ error: 'El nombre del curso es requerido' });
-  }
+router.post("/", validateCurso, async (req, res) => {
+  const {
+    nombre,
+    descripcion,
+    inscriptos_max,
+    id_curso_estado,
+    fecha_inicio,
+    cantidad_horas,
+  } = req.body;
 
   try {
     const result = await pool.query(
-      'INSERT INTO cursos (nombre, descripcion, inscriptos_max, estado) VALUES ($1, $2, $3, $4) RETURNING *',
-      [nombre, descripcion, inscriptos_max, estado || 'activo']
+      "INSERT INTO cursos (nombre, descripcion, inscriptos_max, id_curso_estado, id_usuario_modificacion, fecha_hora_modificacion, fecha_inicio,cantidad_horas) VALUES ($1, $2, $3, $4, 1, NOW(), $5,$6) RETURNING *",
+      [
+        nombre,
+        descripcion || null,
+        inscriptos_max !== undefined && inscriptos_max !== null
+          ? inscriptos_max
+          : null,
+        Number(id_curso_estado) || 1,
+        fecha_inicio || null,
+        cantidad_horas || null,
+      ],
     );
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
@@ -83,11 +104,14 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/cursos/:id - Ver curso
-router.get('/:id', async (req, res) => {
+router.get("/:id", async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM cursos WHERE id = $1', [req.params.id]);
+    const result = await pool.query(
+      "SELECT * FROM cursos WHERE id_curso = $1 AND id_curso_estado = $2",
+      [req.params.id, 1],
+    );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Curso no encontrado' });
+      return res.status(404).json({ error: "Curso no encontrado" });
     }
     res.json({ data: result.rows[0] });
   } catch (err) {
@@ -96,17 +120,51 @@ router.get('/:id', async (req, res) => {
 });
 
 // PUT /api/cursos/:id - Editar curso
-router.put('/:id', async (req, res) => {
-  const { nombre, descripcion, inscriptos_max, estado } = req.body;
+router.put("/:id", validateCurso, async (req, res) => {
+  const {
+    nombre,
+    descripcion,
+    inscriptos_max,
+    id_curso_estado,
+    fecha_inicio,
+    cantidad_horas,
+  } = req.body;
+
+  const max =
+    inscriptos_max !== undefined &&
+    inscriptos_max !== null &&
+    inscriptos_max !== ""
+      ? parseInt(inscriptos_max, 10)
+      : null;
 
   try {
     const result = await pool.query(
-      'UPDATE cursos SET nombre = $1, descripcion = $2, inscriptos_max = $3, estado = $4 WHERE id = $5 RETURNING *',
-      [nombre, descripcion, inscriptos_max, estado, req.params.id]
+      `UPDATE cursos 
+       SET nombre = $2,
+           descripcion = $3,
+           inscriptos_max = $4,
+           id_curso_estado = $5,
+           fecha_inicio = $6,
+           id_usuario_modificacion = 1,
+           fecha_hora_modificacion = NOW(),
+            cantidad_horas = $7
+       WHERE id_curso = $1
+       RETURNING *`,
+      [
+        req.params.id,
+        nombre,
+        descripcion || null,
+        max,
+        Number(id_curso_estado) || 1,
+        fecha_inicio || null,
+        cantidad_horas || null,
+      ],
     );
+
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Curso no encontrado' });
+      return res.status(404).json({ error: "Curso no encontrado" });
     }
+
     res.json({ success: true, data: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -114,32 +172,38 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/cursos/:id - Eliminar curso
-router.delete('/:id', async (req, res) => {
+router.delete("/:id", async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM cursos WHERE id = $1 RETURNING *', [req.params.id]);
+    const result = await pool.query(
+      "UPDATE cursos SET id_curso_estado = 4, id_usuario_modificacion = 1, fecha_hora_modificacion = NOW() WHERE id_curso = $1 RETURNING *",
+      [req.params.id],
+    );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Curso no encontrado' });
+      return res.status(404).json({ error: "Curso no encontrado" });
     }
-    res.json({ success: true, message: 'Curso eliminado' });
+    res.json({ success: true, message: "Curso eliminado" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/cursos/:id/diploma - Generar diploma del curso
-router.get('/:id/diploma', async (req, res) => {
+router.get("/:id/diploma", async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM cursos WHERE id = $1', [req.params.id]);
+    const result = await pool.query(
+      "SELECT * FROM cursos WHERE id_curso_estado = $1",
+      [req.params.id],
+    );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Curso no encontrado' });
+      return res.status(404).json({ error: "Curso no encontrado" });
     }
     // Devuelve los datos para generar el diploma
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       data: {
         curso: result.rows[0],
-        fecha: new Date()
-      }
+        fecha: new Date(),
+      },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

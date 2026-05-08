@@ -8,7 +8,7 @@ const Estudiantes = () => {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
   const [modal, setModal] = useState({ open: false, mode: '', data: null });
-  const [form, setForm] = useState({ nombre: '', apellido: '', dni: '', email: '', telefono: '' });
+  const [form, setForm] = useState({ nombre: '', apellido: '', dni: '', email: '', fecha_nacimiento: '' });
 
   const fetchEstudiantes = async (pageNum = 1, searchTerm = '') => {
     setLoading(true);
@@ -25,7 +25,7 @@ const Estudiantes = () => {
 
   useEffect(() => {
     fetchEstudiantes(page, search);
-  }, [page]);
+  }, [page, search]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -33,14 +33,33 @@ const Estudiantes = () => {
     fetchEstudiantes(1, search);
   };
 
+  const formatDateForInput = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const openModal = (mode, data = null) => {
     setModal({ open: true, mode, data });
-    setForm(data || { nombre: '', apellido: '', dni: '', email: '', telefono: '' });
+    if (data) {
+      setForm({
+        nombre: data.nombre || '',
+        apellido: data.apellido || '',
+        dni: data.dni || '',
+        email: data.email || '',
+        fecha_nacimiento: formatDateForInput(data.fecha_nacimiento)
+      });
+    } else {
+      setForm({ nombre: '', apellido: '', dni: '', email: '', fecha_nacimiento: '' });
+    }
   };
 
   const closeModal = () => {
     setModal({ open: false, mode: '', data: null });
-    setForm({ nombre: '', apellido: '', dni: '', email: '', telefono: '' });
+    setForm({ nombre: '', apellido: '', dni: '', email: '', fecha_nacimiento: '' });
   };
 
   const handleSubmit = async (e) => {
@@ -100,7 +119,7 @@ const Estudiantes = () => {
               <th>Apellido</th>
               <th>DNI</th>
               <th>Email</th>
-              <th>Teléfono</th>
+              <th>Fecha de Nacimiento</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -112,7 +131,7 @@ const Estudiantes = () => {
                 <td>{est.apellido}</td>
                 <td>{est.dni}</td>
                 <td>{est.email}</td>
-                <td>{est.telefono}</td>
+                <td>{est.fecha_nacimiento ? new Date(est.fecha_nacimiento).toLocaleDateString('es-AR') : '-'}</td>
                 <td>
                   <button onClick={() => openModal('view', est)}>Ver</button>{' '}
                   <button onClick={() => openModal('edit', est)}>Editar</button>{' '}
@@ -142,7 +161,7 @@ const Estudiantes = () => {
                 <p><strong>Apellido:</strong> {modal.data.apellido}</p>
                 <p><strong>DNI:</strong> {modal.data.dni}</p>
                 <p><strong>Email:</strong> {modal.data.email}</p>
-                <p><strong>Teléfono:</strong> {modal.data.telefono}</p>
+                <p><strong>Fecha de Nacimiento:</strong> {modal.data.fecha_nacimiento ? new Date(modal.data.fecha_nacimiento).toLocaleDateString('es-AR') : '-'}</p>
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
@@ -150,7 +169,7 @@ const Estudiantes = () => {
                 <div><label>Apellido</label><br /><input value={form.apellido} onChange={e => setForm({...form, apellido: e.target.value})} required /></div>
                 <div><label>DNI</label><br /><input value={form.dni} onChange={e => setForm({...form, dni: e.target.value})} required /></div>
                 <div><label>Email</label><br /><input value={form.email} onChange={e => setForm({...form, email: e.target.value})} /></div>
-                <div><label>Teléfono</label><br /><input value={form.telefono} onChange={e => setForm({...form, telefono: e.target.value})} /></div>
+                <div><label>Fecha de Nacimiento</label><br /><input type="date" value={form.fecha_nacimiento || ''} onChange={e => setForm({...form, fecha_nacimiento: e.target.value})} /></div>
                 <button type="submit" style={{ marginTop: '10px', padding: '8px 16px' }}>Guardar</button>
               </form>
             )}

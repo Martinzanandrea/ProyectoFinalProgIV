@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const pool = require('./db');
+const errorHandler = require('./middlewares/errorHandler');
 
 app.use(cors());
 app.use(express.json());
@@ -36,6 +37,9 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/estudiantes', require('./routes/estudiantes'));
 app.use('/api/cursos', require('./routes/cursos'));
 app.use('/api/inscripciones', require('./routes/inscripciones'));
+
+// Middleware de error centralizado
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
