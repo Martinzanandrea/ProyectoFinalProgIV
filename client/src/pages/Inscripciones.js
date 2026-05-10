@@ -3,10 +3,10 @@ import {
   getInscripciones,
   createInscripcion,
   deleteInscripcion,
-  getDiplomaInscripcion,
   getEstudiantes,
   getCursos,
 } from "../services/api";
+import axios from "axios";
 
 const Inscripciones = () => {
   const [inscripciones, setInscripciones] = useState([]);
@@ -80,20 +80,16 @@ const Inscripciones = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const estudianteId = Number(form.id_estudiante);
     const cursoId = Number(form.id_curso);
-
     if (!estudianteId || !cursoId) {
       alert("Debe seleccionar un estudiante y un curso");
       return;
     }
-
     try {
       const fechaISO = form.fecha_hora_inscripcion
         ? new Date(form.fecha_hora_inscripcion).toISOString()
         : new Date().toISOString();
-
       await createInscripcion({
         id_estudiante: estudianteId,
         id_curso: cursoId,
@@ -102,9 +98,33 @@ const Inscripciones = () => {
       closeModal();
       fetchInscripciones(page);
     } catch (err) {
-      const msg = err.response?.data?.error || "Error al crear inscripción";
-      alert(msg);
+      alert(err.response?.data?.error || "Error al crear inscripción");
       console.error("Error createInscripcion:", err.response || err);
+    }
+  };
+
+  const handleCancelInscripcion = async () => {
+    try {
+      // solo si empezó a completar algo
+      if (form.id_estudiante && form.id_curso) {
+        const fechaISO = form.fecha_hora_inscripcion
+          ? new Date(form.fecha_hora_inscripcion).toISOString()
+          : new Date().toISOString();
+
+        await createInscripcion({
+          id_estudiante: Number(form.id_estudiante),
+          id_curso: Number(form.id_curso),
+          fecha_hora_inscripcion: fechaISO,
+          id_inscripcion_estado: 2, // cancelada
+        });
+
+        fetchInscripciones(page);
+      }
+
+      closeModal();
+    } catch (err) {
+      console.error("Error guardando inscripción cancelada:", err);
+      alert("Error al cancelar inscripción");
     }
   };
 
@@ -119,32 +139,35 @@ const Inscripciones = () => {
     }
   };
 
-  const handleDiploma = async (id) => {
+  const handleDiploma = async (id_inscripcion) => {
     try {
-      const response = await getDiplomaInscripcion(id);
-      const data = response.data.data;
-      const contenido = `
-DIPLOMA DE CURSO
+      const token = localStorage.getItem("token");
 
-Se certifica que:
+      const response = await axios.get(
+        `http://localhost:3001/api/inscripciones/${id_inscripcion}/diploma`,
+        {
+          responseType: "blob",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
 
-${data.estudiante.nombre} ${data.estudiante.apellido}
-Documento: ${data.estudiante.documento}
+      const url = window.URL.createObjectURL(new Blob([response.data]));
 
-Ha completado exitosamente el curso:
+      const link = document.createElement("a");
+      link.href = url;
 
-"${data.curso.nombre}"
+      link.setAttribute(
+        "download",
+        `diploma_inscripcion_${id_inscripcion}.pdf`,
+      );
 
-${data.curso.descripcion || ""}
-
-Fecha de inscripción: ${new Date(data.inscripcion.fecha_hora_inscripcion).toLocaleDateString()}
-      `;
-      alert(contenido);
-      const ventana = window.open("", "_blank");
-      ventana.document.write("<pre>" + contenido + "</pre>");
-      ventana.print();
-    } catch (err) {
-      alert(err.response?.data?.error || "Error al generar diploma");
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Error descargando diploma:", error);
     }
   };
 
@@ -173,6 +196,7 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_hora_inscripcion).toLoc
               <th>Estudiante</th>
               <th>Curso</th>
               <th>Fecha</th>
+              <th>Estado</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -188,12 +212,15 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_hora_inscripcion).toLoc
                   {new Date(ins.fecha_hora_inscripcion).toLocaleDateString()}
                 </td>
                 <td>
+                  {ins.id_inscripcion_estado === 1 ? "Confirmada" : "Cancelada"}
+                </td>
+                <td>
                   <button onClick={() => openModal("view", ins)}>Ver</button>{" "}
                   <button onClick={() => handleDelete(ins.id_inscripcion)}>
                     Eliminar
                   </button>{" "}
                   <button onClick={() => handleDiploma(ins.id_inscripcion)}>
-                    Diploma
+                    📄 Diploma PDF
                   </button>
                 </td>
               </tr>
@@ -277,7 +304,6 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_hora_inscripcion).toLoc
                   >
                     <option value="">Seleccionar estudiante</option>
                     {estudiantes.map((est) => (
-                      // FIX: el backend devuelve "id" (alias de id_estudiante) y "nombre" (alias de nombres)
                       <option key={est.id} value={est.id}>
                         {est.apellido}, {est.nombre}
                       </option>
@@ -332,10 +358,16 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_hora_inscripcion).toLoc
             )}
 
             <button
-              onClick={closeModal}
+              onClick={() => {
+                if (modal.mode === "add") {
+                  handleCancelInscripcion();
+                } else {
+                  closeModal();
+                }
+              }}
               style={{ marginTop: "10px", padding: "8px 16px" }}
             >
-              Cerrar
+              Cancelar
             </button>
           </div>
         </div>

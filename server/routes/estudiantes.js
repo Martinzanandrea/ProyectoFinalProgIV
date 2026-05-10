@@ -2,12 +2,16 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 const validateEstudiante = require("../middlewares/validateEstudiante");
+const {
+  toEstudianteInputDTO,
+  toEstudianteOutputDTO,
+} = require("../dtos/estudiante.dto");
 
-// GET /api/estudiantes/totales - Totales para el dashboard
+// GET /api/estudiantes/totales
 router.get("/totales", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT COUNT(*) as total FROM estudiantes WHERE activo = 1 ",
+      "SELECT COUNT(*) as total FROM estudiantes WHERE activo = 1",
     );
     res.json({ total: parseInt(result.rows[0].total) });
   } catch (err) {
@@ -15,7 +19,7 @@ router.get("/totales", async (req, res) => {
   }
 });
 
-// GET /api/estudiantes - Listado con búsqueda y paginación
+// GET /api/estudiantes
 router.get("/", async (req, res) => {
   const { page = 1, limit = 10, search = "" } = req.query;
   const pageNum = parseInt(page, 10) || 1;
@@ -23,8 +27,7 @@ router.get("/", async (req, res) => {
   const offset = (pageNum - 1) * limitNum;
 
   try {
-    let query =
-      "SELECT id_estudiante as id, documento as dni, apellido, nombres as nombre, email, fecha_nacimiento, activo FROM estudiantes WHERE activo = 1";
+    let query = "SELECT * FROM estudiantes WHERE activo = 1";
     let countQuery = "SELECT COUNT(*) FROM estudiantes WHERE activo = 1";
     let params = [];
     let countParams = [];
@@ -47,15 +50,14 @@ router.get("/", async (req, res) => {
 
     const result = await pool.query(query, params);
     const countResult = await pool.query(countQuery, countParams);
-    const total = parseInt(countResult.rows[0].count);
 
     res.json({
-      data: result.rows,
+      data: result.rows.map(toEstudianteOutputDTO), // Output DTO aplicado a cada fila
       pagination: {
         page: pageNum,
         limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
+        total: parseInt(countResult.rows[0].count),
+        totalPages: Math.ceil(parseInt(countResult.rows[0].count) / limitNum),
       },
     });
   } catch (err) {
@@ -63,13 +65,13 @@ router.get("/", async (req, res) => {
   }
 });
 
-const createEstudianteWithGeneratedId = async ({
-  nombre,
-  apellido,
-  dni,
-  email,
-  fecha_nacimiento,
-}) => {
+// POST /api/estudiantes
+router.post("/", validateEstudiante, async (req, res) => {
+  const dto = toEstudianteInputDTO(req.body); // Input DTO: filtra campos permitidos
+  const usuarioId = req.user?.id;
+  if (!usuarioId)
+    return res.status(401).json({ error: "Usuario no autenticado" });
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -81,85 +83,100 @@ const createEstudianteWithGeneratedId = async ({
     const nextId = idResult.rows[0].next_id;
 
     const result = await client.query(
-      "INSERT INTO estudiantes (id_estudiante, nombres, apellido, documento, email, fecha_nacimiento, activo, id_usuario_modificacion, fecha_hora_modificacion) VALUES ($1, $2, $3, $4, $5, COALESCE($6, CURRENT_DATE), 1, 1, NOW()) RETURNING *",
-      [nextId, nombre, apellido, dni, email || null, fecha_nacimiento || null],
+      `INSERT INTO estudiantes
+         (id_estudiante, nombres, apellido, documento, email, fecha_nacimiento, activo, id_usuario_modificacion, fecha_hora_modificacion)
+       VALUES ($1, $2, $3, $4, $5, COALESCE($6, CURRENT_DATE), 1, $7, NOW())
+       RETURNING *`,
+      [
+        nextId,
+        dto.nombre,
+        dto.apellido,
+        dto.dni,
+        dto.email,
+        dto.fecha_nacimiento,
+        usuarioId,
+      ],
     );
 
     await client.query("COMMIT");
-    return result;
+    res.json({ success: true, data: toEstudianteOutputDTO(result.rows[0]) }); // Output DTO
   } catch (err) {
     await client.query("ROLLBACK");
-    throw err;
+    res.status(500).json({ error: err.message });
   } finally {
     client.release();
   }
-};
-
-// POST /api/estudiantes - Crear estudiante
-router.post("/", validateEstudiante, async (req, res) => {
-  const { nombre, apellido, dni, email, fecha_nacimiento } = req.body;
-
-  try {
-    const result = await createEstudianteWithGeneratedId({
-      nombre,
-      apellido,
-      dni,
-      email,
-      fecha_nacimiento,
-    });
-    res.json({ success: true, data: result.rows[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
 });
 
-// GET /api/estudiantes/:id - Ver estudiante
+// GET /api/estudiantes/:id
 router.get("/:id", async (req, res) => {
   try {
     const result = await pool.query(
-      "SELECT id_estudiante as id, documento as dni, apellido, nombres as nombre, email, fecha_nacimiento, activo FROM estudiantes WHERE id_estudiante = $1 AND activo = 1",
+      "SELECT * FROM estudiantes WHERE id_estudiante = $1 AND activo = 1",
       [req.params.id],
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Estudiante no encontrado" });
     }
-    res.json({ data: result.rows[0] });
+    res.json({ data: toEstudianteOutputDTO(result.rows[0]) }); // Output DTO
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// PUT /api/estudiantes/:id - Editar estudiante
+// PUT /api/estudiantes/:id
 router.put("/:id", validateEstudiante, async (req, res) => {
-  const { nombre, apellido, dni, email, fecha_nacimiento } = req.body;
+  const dto = toEstudianteInputDTO(req.body); // Input DTO
+  const usuarioId = req.user?.id;
+  if (!usuarioId)
+    return res.status(401).json({ error: "Usuario no autenticado" });
 
   try {
     const result = await pool.query(
-      "UPDATE estudiantes SET nombres = $1, apellido = $2, documento = $3, email = $4, fecha_nacimiento = COALESCE($5, fecha_nacimiento), id_usuario_modificacion = 1, fecha_hora_modificacion = NOW() WHERE id_estudiante = $6 RETURNING *",
+      `UPDATE estudiantes
+       SET nombres = $1,
+           apellido = $2,
+           documento = $3,
+           email = $4,
+           fecha_nacimiento = COALESCE($5, fecha_nacimiento),
+           id_usuario_modificacion = $6,
+           fecha_hora_modificacion = NOW()
+       WHERE id_estudiante = $7
+       RETURNING *`,
       [
-        nombre,
-        apellido,
-        dni,
-        email || null,
-        fecha_nacimiento || null,
+        dto.nombre,
+        dto.apellido,
+        dto.dni,
+        dto.email,
+        dto.fecha_nacimiento,
+        usuarioId,
         req.params.id,
       ],
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Estudiante no encontrado" });
     }
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: toEstudianteOutputDTO(result.rows[0]) }); // Output DTO
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// DELETE /api/estudiantes/:id - Eliminar estudiante
+// DELETE /api/estudiantes/:id
 router.delete("/:id", async (req, res) => {
+  const usuarioId = req.user?.id;
+  if (!usuarioId)
+    return res.status(401).json({ error: "Usuario no autenticado" });
+
   try {
     const result = await pool.query(
-      "UPDATE estudiantes SET activo = 0, id_usuario_modificacion = 1, fecha_hora_modificacion = NOW() WHERE id_estudiante = $1 RETURNING *",
-      [req.params.id],
+      `UPDATE estudiantes
+       SET activo = 0,
+           id_usuario_modificacion = $2,
+           fecha_hora_modificacion = NOW()
+       WHERE id_estudiante = $1
+       RETURNING *`,
+      [req.params.id, usuarioId],
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Estudiante no encontrado" });

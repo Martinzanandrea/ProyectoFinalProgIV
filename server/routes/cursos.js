@@ -1,13 +1,14 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const { toCursoInputDTO, toCursoOutputDTO } = require("../dtos/curso.dto");
 
 const toInt = (v) => {
   const n = Number(v);
   return Number.isNaN(n) ? null : n;
 };
 
-// GET /api/cursos - Listado con paginación y búsqueda
+// GET /api/cursos
 router.get("/", async (req, res) => {
   const page = toInt(req.query.page) || 1;
   const limit = toInt(req.query.limit) || 10;
@@ -33,7 +34,7 @@ router.get("/", async (req, res) => {
     const total = parseInt(countResult.rows[0].count, 10);
 
     res.json({
-      data: result.rows,
+      data: result.rows.map(toCursoOutputDTO), // Output DTO
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
@@ -42,37 +43,31 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ── IMPORTANTE: rutas /stats/* antes de /:id ─────────────────
-// Si van después, Express interpreta "stats" como un :id y falla.
+// ── Rutas /stats/* antes de /:id ─────────────────────────────
 
-// GET /api/cursos/stats/total — usado por Dashboard
+// GET /api/cursos/stats/total
 router.get("/stats/total", async (req, res) => {
   try {
     const result = await pool.query("SELECT COUNT(*) FROM cursos");
     res.json({ total: parseInt(result.rows[0].count, 10) });
   } catch (err) {
-    console.error("Error GET /api/cursos/stats/total:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/cursos/stats/activos — cursos con inscripción abierta (estado 2), usado por Dashboard
+// GET /api/cursos/stats/activos
 router.get("/stats/activos", async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id_curso, nombre, descripcion, fecha_inicio, inscriptos_max
-       FROM cursos
-       WHERE id_curso_estado = 2
-       ORDER BY fecha_inicio`,
+      `SELECT * FROM cursos WHERE id_curso_estado = 2 ORDER BY fecha_inicio`,
     );
-    res.json({ data: result.rows });
+    res.json({ data: result.rows.map(toCursoOutputDTO) }); // Output DTO
   } catch (err) {
-    console.error("Error GET /api/cursos/stats/activos:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/cursos/:id — Ver curso individual
+// GET /api/cursos/:id
 router.get("/:id", async (req, res) => {
   const id = toInt(req.params.id);
   if (!id) return res.status(400).json({ error: "ID inválido" });
@@ -85,14 +80,13 @@ router.get("/:id", async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Curso no encontrado" });
     }
-    res.json({ data: result.rows[0] });
+    res.json({ data: toCursoOutputDTO(result.rows[0]) }); // Output DTO
   } catch (err) {
-    console.error("Error GET /api/cursos/:id:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/cursos/:id/diploma — usado por Cursos.js
+// GET /api/cursos/:id/diploma
 router.get("/:id/diploma", async (req, res) => {
   const id = toInt(req.params.id);
   if (!id) return res.status(400).json({ error: "ID inválido" });
@@ -107,40 +101,31 @@ router.get("/:id/diploma", async (req, res) => {
     }
     res.json({
       success: true,
-      data: {
-        curso: result.rows[0],
-        fecha: new Date(),
-      },
+      data: { curso: toCursoOutputDTO(result.rows[0]), fecha: new Date() }, // Output DTO
     });
   } catch (err) {
-    console.error("Error GET /api/cursos/:id/diploma:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // POST /api/cursos
 router.post("/", async (req, res) => {
-  const {
-    nombre,
-    descripcion,
-    fecha_inicio,
-    cantidad_horas,
-    inscriptos_max,
-    id_curso_estado,
-  } = req.body;
+  const dto = toCursoInputDTO(req.body); // Input DTO
   const usuarioId = toInt(req.user?.id);
 
-  if (!nombre || !descripcion || !fecha_inicio || !cantidad_horas) {
-    return res
-      .status(400)
-      .json({
-        error:
-          "nombre, descripcion, fecha_inicio y cantidad_horas son requeridos",
-      });
+  if (
+    !dto.nombre ||
+    !dto.descripcion ||
+    !dto.fecha_inicio ||
+    !dto.cantidad_horas
+  ) {
+    return res.status(400).json({
+      error:
+        "nombre, descripcion, fecha_inicio y cantidad_horas son requeridos",
+    });
   }
-  if (!usuarioId) {
+  if (!usuarioId)
     return res.status(401).json({ error: "Usuario no autenticado" });
-  }
 
   try {
     const result = await pool.query(
@@ -149,16 +134,18 @@ router.post("/", async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        RETURNING *`,
       [
-        nombre,
-        descripcion,
-        fecha_inicio,
-        Number(cantidad_horas),
-        inscriptos_max !== undefined ? Number(inscriptos_max) : null,
-        toInt(id_curso_estado) || 1,
+        dto.nombre,
+        dto.descripcion,
+        dto.fecha_inicio,
+        dto.cantidad_horas,
+        dto.inscriptos_max,
+        dto.id_curso_estado,
         usuarioId,
       ],
     );
-    res.status(201).json({ success: true, data: result.rows[0] });
+    res
+      .status(201)
+      .json({ success: true, data: toCursoOutputDTO(result.rows[0]) }); // Output DTO
   } catch (err) {
     console.error("Error POST /api/cursos:", err);
     res.status(500).json({ error: err.message });
@@ -170,19 +157,10 @@ router.put("/:id", async (req, res) => {
   const id = toInt(req.params.id);
   if (!id) return res.status(400).json({ error: "ID inválido" });
 
-  const {
-    nombre,
-    descripcion,
-    fecha_inicio,
-    cantidad_horas,
-    inscriptos_max,
-    id_curso_estado,
-  } = req.body;
+  const dto = toCursoInputDTO(req.body); // Input DTO
   const usuarioId = toInt(req.user?.id);
-
-  if (!usuarioId) {
+  if (!usuarioId)
     return res.status(401).json({ error: "Usuario no autenticado" });
-  }
 
   try {
     const result = await pool.query(
@@ -198,12 +176,12 @@ router.put("/:id", async (req, res) => {
        WHERE id_curso = $8
        RETURNING *`,
       [
-        nombre || null,
-        descripcion || null,
-        fecha_inicio || null,
-        cantidad_horas ? Number(cantidad_horas) : null,
-        inscriptos_max !== undefined ? Number(inscriptos_max) : null,
-        id_curso_estado ? toInt(id_curso_estado) : null,
+        dto.nombre || null,
+        dto.descripcion || null,
+        dto.fecha_inicio || null,
+        dto.cantidad_horas || null,
+        dto.inscriptos_max,
+        dto.id_curso_estado || null,
         usuarioId,
         id,
       ],
@@ -211,7 +189,7 @@ router.put("/:id", async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Curso no encontrado" });
     }
-    res.json({ success: true, data: result.rows[0] });
+    res.json({ success: true, data: toCursoOutputDTO(result.rows[0]) }); // Output DTO
   } catch (err) {
     console.error("Error PUT /api/cursos/:id:", err);
     res.status(500).json({ error: err.message });
@@ -223,7 +201,15 @@ router.delete("/:id", async (req, res) => {
   const id = toInt(req.params.id);
   if (!id) return res.status(400).json({ error: "ID inválido" });
 
+  const usuarioId = toInt(req.user?.id);
+  if (!usuarioId)
+    return res.status(401).json({ error: "Usuario no autenticado" });
+
   try {
+    await pool.query(
+      `UPDATE cursos SET id_usuario_modificacion = $1, fecha_hora_modificacion = NOW() WHERE id_curso = $2`,
+      [usuarioId, id],
+    );
     const result = await pool.query(
       "DELETE FROM cursos WHERE id_curso = $1 RETURNING *",
       [id],

@@ -1,13 +1,18 @@
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
+const {
+  toInscripcionInputDTO,
+  toInscripcionOutputDTO,
+} = require("../dtos/inscripcion.dto");
+const { generarDiplomaPDF } = require("../services/diplomaService");
 
 const toInt = (v) => {
   const n = Number(v);
   return Number.isNaN(n) ? null : n;
 };
 
-// GET /api/inscripciones - Listado con paginación
+// GET /api/inscripciones
 router.get("/", async (req, res) => {
   const page = toInt(req.query.page) || 1;
   const limit = toInt(req.query.limit) || 10;
@@ -32,7 +37,7 @@ router.get("/", async (req, res) => {
 
     const total = parseInt(countResult.rows[0].count, 10);
     res.json({
-      data: result.rows,
+      data: result.rows.map(toInscripcionOutputDTO),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
@@ -43,20 +48,12 @@ router.get("/", async (req, res) => {
 
 // POST /api/inscripciones
 router.post("/", async (req, res) => {
-  const estudianteId = toInt(req.body.id_estudiante);
-  const cursoId = toInt(req.body.id_curso);
-  const fecha_hora_inscripcion = req.body.fecha_hora_inscripcion || null;
+  const dto = toInscripcionInputDTO(req.body);
   const usuarioId = toInt(req.user?.id);
 
-  if (!usuarioId) {
+  if (!usuarioId)
     return res.status(401).json({ error: "Usuario no autenticado" });
-  }
-  if (
-    estudianteId === null ||
-    cursoId === null ||
-    estudianteId === 0 ||
-    cursoId === 0
-  ) {
+  if (!dto.id_estudiante || !dto.id_curso) {
     return res.status(400).json({ error: "Estudiante y curso son requeridos" });
   }
 
@@ -65,10 +62,9 @@ router.post("/", async (req, res) => {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock($1)", [123456789]);
 
-    // Verificar duplicado
     const dup = await client.query(
       "SELECT 1 FROM inscripciones WHERE id_estudiante = $1 AND id_curso = $2",
-      [estudianteId, cursoId],
+      [dto.id_estudiante, dto.id_curso],
     );
     if (dup.rows.length > 0) {
       await client.query("ROLLBACK");
@@ -77,10 +73,9 @@ router.post("/", async (req, res) => {
         .json({ error: "El estudiante ya está inscripto en este curso" });
     }
 
-    // Verificar curso y estado
     const cursoRes = await client.query(
       "SELECT id_curso, inscriptos_max, id_curso_estado FROM cursos WHERE id_curso = $1",
-      [cursoId],
+      [dto.id_curso],
     );
     if (cursoRes.rows.length === 0) {
       await client.query("ROLLBACK");
@@ -88,15 +83,16 @@ router.post("/", async (req, res) => {
     }
     if (toInt(cursoRes.rows[0].id_curso_estado) !== 2) {
       await client.query("ROLLBACK");
-      return res.status(400).json({
-        error: "Las inscripciones no están habilitadas para este curso",
-      });
+      return res
+        .status(400)
+        .json({
+          error: "Las inscripciones no están habilitadas para este curso",
+        });
     }
 
-    // Verificar cupo
     const insCountRes = await client.query(
       "SELECT COUNT(*) FROM inscripciones WHERE id_curso = $1",
-      [cursoId],
+      [dto.id_curso],
     );
     const cantidadActual = parseInt(insCountRes.rows[0].count, 10);
     const inscriptosMax =
@@ -110,10 +106,9 @@ router.post("/", async (req, res) => {
         .json({ error: "No hay cupo disponible en este curso" });
     }
 
-    // Verificar estudiante activo
     const estRes = await client.query(
       "SELECT id_estudiante FROM estudiantes WHERE id_estudiante = $1 AND activo = 1",
-      [estudianteId],
+      [dto.id_estudiante],
     );
     if (estRes.rows.length === 0) {
       await client.query("ROLLBACK");
@@ -122,17 +117,18 @@ router.post("/", async (req, res) => {
         .json({ error: "Estudiante no encontrado o inactivo" });
     }
 
-    // INSERT — id_inscripcion es serial, Postgres lo maneja solo
     const insertRes = await client.query(
       `INSERT INTO inscripciones
          (id_curso, id_estudiante, fecha_hora_inscripcion, id_inscripcion_estado, id_usuario_modificacion, fecha_hora_modificacion)
        VALUES ($1, $2, COALESCE($3, NOW()), 1, $4, NOW())
        RETURNING *`,
-      [cursoId, estudianteId, fecha_hora_inscripcion, usuarioId],
+      [dto.id_curso, dto.id_estudiante, dto.fecha_hora_inscripcion, usuarioId],
     );
 
     await client.query("COMMIT");
-    return res.status(201).json({ success: true, data: insertRes.rows[0] });
+    return res
+      .status(201)
+      .json({ success: true, data: toInscripcionOutputDTO(insertRes.rows[0]) });
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("Error POST /api/inscripciones:", err.stack || err);
@@ -171,7 +167,7 @@ router.get("/:id", async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Inscripción no encontrada" });
     }
-    res.json({ data: result.rows[0] });
+    res.json({ data: toInscripcionOutputDTO(result.rows[0]) });
   } catch (err) {
     console.error("Error GET /api/inscripciones/:id", err);
     res.status(500).json({ error: err.message });
@@ -198,7 +194,7 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-// GET /api/inscripciones/:id/diploma
+// GET /api/inscripciones/:id/diploma — genera y descarga el PDF con QR
 router.get("/:id/diploma", async (req, res) => {
   const id = toInt(req.params.id);
   if (!id) return res.status(400).json({ error: "ID inválido" });
@@ -222,25 +218,27 @@ router.get("/:id/diploma", async (req, res) => {
     }
 
     const row = result.rows[0];
-    res.json({
-      success: true,
-      data: {
-        inscripcion: row,
-        estudiante: {
-          nombre: row.estudiante_nombre,
-          apellido: row.estudiante_apellido,
-          documento: row.estudiante_documento,
-        },
-        curso: {
-          nombre: row.curso_nombre,
-          descripcion: row.curso_descripcion,
-        },
-        fecha: new Date(),
+
+    await generarDiplomaPDF(res, {
+      inscripcion: {
+        id_inscripcion: row.id_inscripcion,
+        fecha_hora_inscripcion: row.fecha_hora_inscripcion,
+      },
+      estudiante: {
+        nombre: row.estudiante_nombre,
+        apellido: row.estudiante_apellido,
+        documento: row.estudiante_documento,
+      },
+      curso: {
+        nombre: row.curso_nombre,
+        descripcion: row.curso_descripcion,
       },
     });
   } catch (err) {
     console.error("Error GET /api/inscripciones/:id/diploma", err);
-    res.status(500).json({ error: err.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    }
   }
 });
 
