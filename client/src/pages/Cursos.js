@@ -5,7 +5,15 @@ import {
   updateCurso,
   deleteCurso,
   getDiplomaCurso,
+  getInscriptosCurso,
 } from "../services/api";
+
+const ESTADOS = {
+  1: "Borrador",
+  2: "Inscripción Abierta",
+  3: "Inscripción Cerrada",
+  4: "Eliminado",
+};
 
 const Cursos = () => {
   const [cursos, setCursos] = useState([]);
@@ -19,6 +27,11 @@ const Cursos = () => {
     totalPages: 0,
   });
   const [modal, setModal] = useState({ open: false, mode: "", data: null });
+  const [modalInscriptos, setModalInscriptos] = useState({
+    open: false,
+    data: null,
+    loading: false,
+  });
   const [form, setForm] = useState({
     nombre: "",
     descripcion: "",
@@ -60,6 +73,7 @@ const Cursos = () => {
         inscriptos_max: 0,
         id_curso_estado: 1,
         fecha_inicio: null,
+        cantidad_horas: 0,
       },
     );
   };
@@ -75,6 +89,22 @@ const Cursos = () => {
       cantidad_horas: 0,
     });
   };
+
+  // Abrir modal de inscriptos
+  const openInscriptos = async (id) => {
+    setModalInscriptos({ open: true, data: null, loading: true });
+    try {
+      const res = await getInscriptosCurso(id);
+      setModalInscriptos({ open: true, data: res.data.data, loading: false });
+    } catch (err) {
+      console.error("Error completo:", err.response); // ← agregá esto
+      alert("Error al cargar inscriptos");
+      setModalInscriptos({ open: false, data: null, loading: false });
+    }
+  };
+
+  const closeInscriptos = () =>
+    setModalInscriptos({ open: false, data: null, loading: false });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -111,18 +141,8 @@ const Cursos = () => {
     try {
       const response = await getDiplomaCurso(id);
       const curso = response.data.data.curso;
-      const contenido = `
-DIPLOMA
-
-Se certifica que el curso:
-"${curso.nombre}"
-
-${curso.descripcion || ""}
-
-Fecha: ${new Date().toLocaleDateString()}
-      `;
+      const contenido = `DIPLOMA\n\nSe certifica que el curso:\n"${curso.nombre}"\n\n${curso.descripcion || ""}\n\nFecha: ${new Date().toLocaleDateString()}`;
       alert(contenido);
-      // Aquí podrías abrir una ventana de impresión
       const ventana = window.open("", "_blank");
       ventana.document.write("<pre>" + contenido + "</pre>");
       ventana.print();
@@ -131,11 +151,48 @@ Fecha: ${new Date().toLocaleDateString()}
     }
   };
 
+  // Barra de progreso de cupo
+  const CupoBadge = ({ actual, max }) => {
+    if (max === null || max === undefined) {
+      return <span style={{ color: "#888" }}>{actual} / Sin límite</span>;
+    }
+    const pct = Math.min((actual / max) * 100, 100);
+    const color = pct >= 100 ? "#e74c3c" : pct >= 80 ? "#f39c12" : "#27ae60";
+    return (
+      <div style={{ minWidth: 120 }}>
+        <div style={{ fontSize: 13, marginBottom: 3 }}>
+          <span style={{ color, fontWeight: "bold" }}>{actual}</span>
+          <span style={{ color: "#888" }}> de {max} </span>
+          <span style={{ color: "#aaa", fontSize: 11 }}>
+            ({max - actual} libre{max - actual !== 1 ? "s" : ""})
+          </span>
+        </div>
+        <div
+          style={{
+            background: "#eee",
+            borderRadius: 4,
+            height: 6,
+            width: "100%",
+          }}
+        >
+          <div
+            style={{
+              background: color,
+              borderRadius: 4,
+              height: 6,
+              width: `${pct}%`,
+              transition: "width 0.3s",
+            }}
+          />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
       <h2>Cursos</h2>
 
-      {/* Buscador */}
       <form onSubmit={handleSearch} style={{ marginBottom: "20px" }}>
         <input
           type="text"
@@ -149,7 +206,6 @@ Fecha: ${new Date().toLocaleDateString()}
         </button>
       </form>
 
-      {/* Botón agregar */}
       <button
         onClick={() => openModal("add")}
         style={{ marginBottom: "20px", padding: "8px 16px" }}
@@ -157,7 +213,6 @@ Fecha: ${new Date().toLocaleDateString()}
         + Nuevo Curso
       </button>
 
-      {/* Tabla */}
       {loading ? (
         <p>Cargando...</p>
       ) : (
@@ -171,7 +226,7 @@ Fecha: ${new Date().toLocaleDateString()}
               <th>ID</th>
               <th>Nombre</th>
               <th>Descripción</th>
-              <th>Cupo Máximo</th>
+              <th>Inscriptos / Cupo</th>
               <th>Estado</th>
               <th>Inicio</th>
               <th>Acciones</th>
@@ -184,19 +239,27 @@ Fecha: ${new Date().toLocaleDateString()}
                 <td>{cur.nombre}</td>
                 <td>{cur.descripcion}</td>
                 <td>
-                  {cur.inscriptos_max !== null
-                    ? cur.inscriptos_max
-                    : "Sin límite"}
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <CupoBadge
+                      actual={cur.inscriptos_actual ?? 0}
+                      max={cur.inscriptos_max}
+                    />
+                    <button
+                      onClick={() => openInscriptos(cur.id_curso)}
+                      style={{
+                        fontSize: 11,
+                        padding: "2px 6px",
+                        cursor: "pointer",
+                      }}
+                      title="Ver listado de inscriptos"
+                    >
+                      Ver
+                    </button>
+                  </div>
                 </td>
-
-                <td>
-                  {{
-                    1: "Borrador",
-                    2: "Inscripción Abierta",
-                    3: "Inscripción Cerrada",
-                    4: "Eliminado",
-                  }[cur.id_curso_estado] || "Desconocido"}
-                </td>
+                <td>{ESTADOS[cur.id_curso_estado] || "Desconocido"}</td>
                 <td>
                   {cur.fecha_inicio
                     ? new Date(cur.fecha_inicio).toLocaleDateString()
@@ -218,7 +281,6 @@ Fecha: ${new Date().toLocaleDateString()}
         </table>
       )}
 
-      {/* Paginación */}
       <div style={{ marginTop: "20px" }}>
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -237,7 +299,149 @@ Fecha: ${new Date().toLocaleDateString()}
         </button>
       </div>
 
-      {/* Modal */}
+      {/* ── Modal inscriptos ── */}
+      {modalInscriptos.open && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: "24px",
+              borderRadius: "8px",
+              minWidth: "600px",
+              maxWidth: "800px",
+              maxHeight: "80vh",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {modalInscriptos.loading ? (
+              <p>Cargando inscriptos...</p>
+            ) : modalInscriptos.data ? (
+              <>
+                <h3 style={{ marginTop: 0 }}>
+                  Inscriptos — {modalInscriptos.data.curso.nombre}
+                </h3>
+
+                {/* Resumen de cupo */}
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 20,
+                    marginBottom: 16,
+                    padding: "12px 16px",
+                    background: "#f8f9fa",
+                    borderRadius: 6,
+                    fontSize: 14,
+                  }}
+                >
+                  <span>
+                    <strong>Inscriptos:</strong>{" "}
+                    <span
+                      style={{
+                        color: "#2c3e50",
+                        fontSize: 18,
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {modalInscriptos.data.inscriptos_actual}
+                    </span>
+                  </span>
+                  <span>
+                    <strong>Cupo máximo:</strong>{" "}
+                    {modalInscriptos.data.inscriptos_max ?? "Sin límite"}
+                  </span>
+                  <span>
+                    <strong>Cupos disponibles:</strong>{" "}
+                    <span
+                      style={{
+                        color:
+                          modalInscriptos.data.cupos_disponibles === 0
+                            ? "#e74c3c"
+                            : "#27ae60",
+                        fontWeight: "bold",
+                      }}
+                    >
+                      {modalInscriptos.data.cupos_disponibles ?? "∞"}
+                    </span>
+                  </span>
+                </div>
+
+                {/* Tabla de estudiantes */}
+                <div style={{ overflowY: "auto", flex: 1 }}>
+                  {modalInscriptos.data.estudiantes.length === 0 ? (
+                    <p style={{ color: "#888" }}>
+                      No hay inscriptos confirmados en este curso.
+                    </p>
+                  ) : (
+                    <table
+                      border="1"
+                      cellPadding="6"
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: 13,
+                      }}
+                    >
+                      <thead style={{ background: "#f0f0f0" }}>
+                        <tr>
+                          <th>#</th>
+                          <th>Apellido y Nombre</th>
+                          <th>Documento</th>
+                          <th>Email</th>
+                          <th>Fecha Inscripción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {modalInscriptos.data.estudiantes.map((est, idx) => (
+                          <tr key={est.id_inscripcion}>
+                            <td style={{ textAlign: "center" }}>{idx + 1}</td>
+                            <td>
+                              {est.apellido}, {est.nombre}
+                            </td>
+                            <td>{est.documento}</td>
+                            <td>{est.email}</td>
+                            <td>
+                              {new Date(
+                                est.fecha_hora_inscripcion,
+                              ).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </>
+            ) : null}
+
+            <button
+              onClick={closeInscriptos}
+              style={{
+                marginTop: "16px",
+                padding: "8px 16px",
+                alignSelf: "flex-end",
+              }}
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal agregar/editar/ver curso ── */}
       {modal.open && (
         <div
           style={{
@@ -280,7 +484,7 @@ Fecha: ${new Date().toLocaleDateString()}
                   {modal.data.inscriptos_max || "Sin límite"}
                 </p>
                 <p>
-                  <strong>Estado:</strong> {modal.data.id_curso_estado}
+                  <strong>Estado:</strong> {ESTADOS[modal.data.id_curso_estado]}
                 </p>
                 <p>
                   <strong>Inicio:</strong>{" "}

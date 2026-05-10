@@ -6,7 +6,6 @@ const api = axios.create({
   baseURL: API_URL,
 });
 
-// Adjunta el token JWT en cada request automáticamente
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
@@ -18,7 +17,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Si el token expiró o es inválido, limpia storage y redirige al login
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -50,7 +48,6 @@ export const updateEstudiante = (id, data) =>
 
 export const deleteEstudiante = (id) => api.delete(`/estudiantes/${id}`);
 
-// FIX: el backend define /totales, no /stats/total
 export const getTotalEstudiantes = () => api.get("/estudiantes/totales");
 
 // ── Cursos ───────────────────────────────────────────────────
@@ -65,12 +62,14 @@ export const updateCurso = (id, data) => api.put(`/cursos/${id}`, data);
 
 export const deleteCurso = (id) => api.delete(`/cursos/${id}`);
 
-// Estos tres endpoints están definidos en cursos-router.js
 export const getTotalCursos = () => api.get("/cursos/stats/total");
 
 export const getCursosActivos = () => api.get("/cursos/stats/activos");
 
 export const getDiplomaCurso = (id) => api.get(`/cursos/${id}/diploma`);
+
+// Lista de inscriptos confirmados en un curso con datos de cupo
+export const getInscriptosCurso = (id) => api.get(`/cursos/${id}/inscriptos`);
 
 // ── Inscripciones ────────────────────────────────────────────
 export const getInscripciones = (page = 1, limit = 10) =>
@@ -79,6 +78,9 @@ export const getInscripciones = (page = 1, limit = 10) =>
 export const getInscripcion = (id) => api.get(`/inscripciones/${id}`);
 
 export const createInscripcion = (data) => api.post("/inscripciones", data);
+
+export const cancelarInscripcion = (id) =>
+  api.patch(`/inscripciones/${id}/cancelar`);
 
 export const deleteInscripcion = (id) => api.delete(`/inscripciones/${id}`);
 

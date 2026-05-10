@@ -3,10 +3,16 @@ import {
   getInscripciones,
   createInscripcion,
   deleteInscripcion,
+  cancelarInscripcion,
   getEstudiantes,
   getCursos,
 } from "../services/api";
 import axios from "axios";
+
+const ESTADOS = {
+  1: { label: "Confirmada", color: "#27ae60" },
+  2: { label: "Cancelada", color: "#e74c3c" },
+};
 
 const Inscripciones = () => {
   const [inscripciones, setInscripciones] = useState([]);
@@ -99,32 +105,18 @@ const Inscripciones = () => {
       fetchInscripciones(page);
     } catch (err) {
       alert(err.response?.data?.error || "Error al crear inscripción");
-      console.error("Error createInscripcion:", err.response || err);
     }
   };
 
-  const handleCancelInscripcion = async () => {
-    try {
-      // solo si empezó a completar algo
-      if (form.id_estudiante && form.id_curso) {
-        const fechaISO = form.fecha_hora_inscripcion
-          ? new Date(form.fecha_hora_inscripcion).toISOString()
-          : new Date().toISOString();
-
-        await createInscripcion({
-          id_estudiante: Number(form.id_estudiante),
-          id_curso: Number(form.id_curso),
-          fecha_hora_inscripcion: fechaISO,
-          id_inscripcion_estado: 2, // cancelada
-        });
-
+  // Cancelar una inscripción ya existente desde la tabla
+  const handleCancelar = async (id) => {
+    if (window.confirm("¿Cancelar esta inscripción?")) {
+      try {
+        await cancelarInscripcion(id);
         fetchInscripciones(page);
+      } catch (err) {
+        alert(err.response?.data?.error || "Error al cancelar");
       }
-
-      closeModal();
-    } catch (err) {
-      console.error("Error guardando inscripción cancelada:", err);
-      alert("Error al cancelar inscripción");
     }
   };
 
@@ -142,32 +134,23 @@ const Inscripciones = () => {
   const handleDiploma = async (id_inscripcion) => {
     try {
       const token = localStorage.getItem("token");
-
       const response = await axios.get(
         `http://localhost:3001/api/inscripciones/${id_inscripcion}/diploma`,
-        {
-          responseType: "blob",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
+        { responseType: "blob", headers: { Authorization: `Bearer ${token}` } },
       );
-
       const url = window.URL.createObjectURL(new Blob([response.data]));
-
       const link = document.createElement("a");
       link.href = url;
-
       link.setAttribute(
         "download",
         `diploma_inscripcion_${id_inscripcion}.pdf`,
       );
-
       document.body.appendChild(link);
       link.click();
       link.remove();
     } catch (error) {
       console.error("Error descargando diploma:", error);
+      alert("Error al descargar el diploma");
     }
   };
 
@@ -201,30 +184,69 @@ const Inscripciones = () => {
             </tr>
           </thead>
           <tbody>
-            {inscripciones.map((ins) => (
-              <tr key={ins.id_inscripcion}>
-                <td>{ins.id_inscripcion}</td>
-                <td>
-                  {ins.estudiante_apellido}, {ins.estudiante_nombre}
-                </td>
-                <td>{ins.curso_nombre}</td>
-                <td>
-                  {new Date(ins.fecha_hora_inscripcion).toLocaleDateString()}
-                </td>
-                <td>
-                  {ins.id_inscripcion_estado === 1 ? "Confirmada" : "Cancelada"}
-                </td>
-                <td>
-                  <button onClick={() => openModal("view", ins)}>Ver</button>{" "}
-                  <button onClick={() => handleDelete(ins.id_inscripcion)}>
-                    Eliminar
-                  </button>{" "}
-                  <button onClick={() => handleDiploma(ins.id_inscripcion)}>
-                    📄 Diploma PDF
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {inscripciones.map((ins) => {
+              const estado = ESTADOS[ins.id_inscripcion_estado] || {
+                label: "Desconocido",
+                color: "#999",
+              };
+              const esCancelada = ins.id_inscripcion_estado === 2;
+              return (
+                <tr
+                  key={ins.id_inscripcion}
+                  style={{ background: esCancelada ? "#fdf0f0" : "white" }}
+                >
+                  <td>{ins.id_inscripcion}</td>
+                  <td>
+                    {ins.estudiante_apellido}, {ins.estudiante_nombre}
+                  </td>
+                  <td>{ins.curso_nombre}</td>
+                  <td>
+                    {new Date(ins.fecha_hora_inscripcion).toLocaleDateString()}
+                  </td>
+                  <td>
+                    <span
+                      style={{
+                        color: estado.color,
+                        fontWeight: "bold",
+                        padding: "2px 8px",
+                        borderRadius: "4px",
+                        border: `1px solid ${estado.color}`,
+                        fontSize: "12px",
+                      }}
+                    >
+                      {estado.label}
+                    </span>
+                  </td>
+                  <td>
+                    <button onClick={() => openModal("view", ins)}>Ver</button>{" "}
+                    {/* Solo mostrar Cancelar si está Confirmada */}
+                    {!esCancelada && (
+                      <button
+                        onClick={() => handleCancelar(ins.id_inscripcion)}
+                        style={{ color: "#e74c3c" }}
+                      >
+                        Cancelar
+                      </button>
+                    )}{" "}
+                    {/* Eliminar solo visible en canceladas */}
+                    {esCancelada && (
+                      <button
+                        onClick={() => handleDelete(ins.id_inscripcion)}
+                        style={{ color: "#c0392b", fontWeight: "bold" }}
+                      >
+                        Eliminar
+                      </button>
+                    )}{" "}
+                    {/* Diploma solo para confirmadas */}
+                    {!esCancelada && (
+                      <button onClick={() => handleDiploma(ins.id_inscripcion)}>
+                        📄 Diploma PDF
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
@@ -287,6 +309,17 @@ const Inscripciones = () => {
                   {new Date(
                     modal.data.fecha_hora_inscripcion,
                   ).toLocaleDateString()}
+                </p>
+                <p>
+                  <strong>Estado:</strong>{" "}
+                  <span
+                    style={{
+                      color: ESTADOS[modal.data.id_inscripcion_estado]?.color,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    {ESTADOS[modal.data.id_inscripcion_estado]?.label}
+                  </span>
                 </p>
               </div>
             ) : (
@@ -358,16 +391,10 @@ const Inscripciones = () => {
             )}
 
             <button
-              onClick={() => {
-                if (modal.mode === "add") {
-                  handleCancelInscripcion();
-                } else {
-                  closeModal();
-                }
-              }}
+              onClick={closeModal}
               style={{ marginTop: "10px", padding: "8px 16px" }}
             >
-              Cancelar
+              Cerrar
             </button>
           </div>
         </div>

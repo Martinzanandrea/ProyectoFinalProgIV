@@ -12,7 +12,7 @@ const toInt = (v) => {
   return Number.isNaN(n) ? null : n;
 };
 
-// GET /api/inscripciones
+// GET /api/inscripciones — excluye eliminadas (estado 3)
 router.get("/", async (req, res) => {
   const page = toInt(req.query.page) || 1;
   const limit = toInt(req.query.limit) || 10;
@@ -28,11 +28,14 @@ router.get("/", async (req, res) => {
          FROM inscripciones i
          JOIN estudiantes e ON i.id_estudiante = e.id_estudiante
          JOIN cursos c      ON i.id_curso      = c.id_curso
+         WHERE i.id_inscripcion_estado != 3
          ORDER BY i.id_inscripcion
          LIMIT $1 OFFSET $2`,
         [limit, offset],
       ),
-      pool.query("SELECT COUNT(*) FROM inscripciones"),
+      pool.query(
+        "SELECT COUNT(*) FROM inscripciones WHERE id_inscripcion_estado != 3",
+      ),
     ]);
 
     const total = parseInt(countResult.rows[0].count, 10);
@@ -62,8 +65,10 @@ router.post("/", async (req, res) => {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock($1)", [123456789]);
 
+    // Verificar duplicado (solo entre confirmadas y canceladas, no eliminadas)
     const dup = await client.query(
-      "SELECT 1 FROM inscripciones WHERE id_estudiante = $1 AND id_curso = $2",
+      `SELECT 1 FROM inscripciones
+       WHERE id_estudiante = $1 AND id_curso = $2 AND id_inscripcion_estado != 3`,
       [dto.id_estudiante, dto.id_curso],
     );
     if (dup.rows.length > 0) {
@@ -74,7 +79,7 @@ router.post("/", async (req, res) => {
     }
 
     const cursoRes = await client.query(
-      "SELECT id_curso, inscriptos_max, id_curso_estado FROM cursos WHERE id_curso = $1",
+      "SELECT id_curso, inscriptos_max, id_curso_estado FROM cursos WHERE id_curso = $1 AND id_curso_estado != 4",
       [dto.id_curso],
     );
     if (cursoRes.rows.length === 0) {
@@ -91,7 +96,7 @@ router.post("/", async (req, res) => {
     }
 
     const insCountRes = await client.query(
-      "SELECT COUNT(*) FROM inscripciones WHERE id_curso = $1",
+      "SELECT COUNT(*) FROM inscripciones WHERE id_curso = $1 AND id_inscripcion_estado = 1",
       [dto.id_curso],
     );
     const cantidadActual = parseInt(insCountRes.rows[0].count, 10);
@@ -145,6 +150,66 @@ router.post("/", async (req, res) => {
   }
 });
 
+// PATCH /api/inscripciones/:id/cancelar — soft: estado 2
+router.patch("/:id/cancelar", async (req, res) => {
+  const id = toInt(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID inválido" });
+
+  const usuarioId = toInt(req.user?.id);
+  if (!usuarioId)
+    return res.status(401).json({ error: "Usuario no autenticado" });
+
+  try {
+    const result = await pool.query(
+      `UPDATE inscripciones
+       SET id_inscripcion_estado = 2,
+           id_usuario_modificacion = $2,
+           fecha_hora_modificacion = NOW()
+       WHERE id_inscripcion = $1 AND id_inscripcion_estado = 1
+       RETURNING *`,
+      [id, usuarioId],
+    );
+    if (result.rows.length === 0) {
+      return res
+        .status(404)
+        .json({ error: "Inscripción no encontrada o ya cancelada" });
+    }
+    res.json({ success: true, data: toInscripcionOutputDTO(result.rows[0]) });
+  } catch (err) {
+    console.error("Error PATCH /api/inscripciones/:id/cancelar:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/inscripciones/:id — SOFT DELETE: estado 3 (ELIMINADA)
+router.delete("/:id", async (req, res) => {
+  const id = toInt(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID inválido" });
+
+  const usuarioId = toInt(req.user?.id);
+  if (!usuarioId)
+    return res.status(401).json({ error: "Usuario no autenticado" });
+
+  try {
+    const result = await pool.query(
+      `UPDATE inscripciones
+       SET id_inscripcion_estado = 3,
+           id_usuario_modificacion = $2,
+           fecha_hora_modificacion = NOW()
+       WHERE id_inscripcion = $1 AND id_inscripcion_estado != 3
+       RETURNING *`,
+      [id, usuarioId],
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Inscripción no encontrada" });
+    }
+    res.json({ success: true, message: "Inscripción eliminada" });
+  } catch (err) {
+    console.error("Error DELETE /api/inscripciones/:id:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/inscripciones/:id
 router.get("/:id", async (req, res) => {
   const id = toInt(req.params.id);
@@ -161,7 +226,7 @@ router.get("/:id", async (req, res) => {
        FROM inscripciones i
        JOIN estudiantes e ON i.id_estudiante = e.id_estudiante
        JOIN cursos c      ON i.id_curso      = c.id_curso
-       WHERE i.id_inscripcion = $1`,
+       WHERE i.id_inscripcion = $1 AND i.id_inscripcion_estado != 3`,
       [id],
     );
     if (result.rows.length === 0) {
@@ -174,27 +239,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/inscripciones/:id
-router.delete("/:id", async (req, res) => {
-  const id = toInt(req.params.id);
-  if (!id) return res.status(400).json({ error: "ID inválido" });
-
-  try {
-    const result = await pool.query(
-      "DELETE FROM inscripciones WHERE id_inscripcion = $1 RETURNING *",
-      [id],
-    );
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Inscripción no encontrada" });
-    }
-    res.json({ success: true, message: "Inscripción eliminada" });
-  } catch (err) {
-    console.error("Error DELETE /api/inscripciones/:id", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /api/inscripciones/:id/diploma — genera y descarga el PDF con QR
+// GET /api/inscripciones/:id/diploma
 router.get("/:id/diploma", async (req, res) => {
   const id = toInt(req.params.id);
   if (!id) return res.status(400).json({ error: "ID inválido" });
@@ -210,15 +255,16 @@ router.get("/:id/diploma", async (req, res) => {
        FROM inscripciones i
        JOIN estudiantes e ON i.id_estudiante = e.id_estudiante
        JOIN cursos c      ON i.id_curso      = c.id_curso
-       WHERE i.id_inscripcion = $1`,
+       WHERE i.id_inscripcion = $1 AND i.id_inscripcion_estado = 1`,
       [id],
     );
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: "Inscripción no encontrada" });
+      return res
+        .status(404)
+        .json({ error: "Inscripción no encontrada o no confirmada" });
     }
 
     const row = result.rows[0];
-
     await generarDiplomaPDF(res, {
       inscripcion: {
         id_inscripcion: row.id_inscripcion,
