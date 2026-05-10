@@ -22,10 +22,9 @@ const Inscripciones = () => {
   });
   const [modal, setModal] = useState({ open: false, mode: "", data: null });
   const [form, setForm] = useState({
-    id_estudiante: 0,
-    id_curso: 0,
-    fecha_hora_inscripcion: null,
-    id_inscripcion_estado: 1,
+    id_estudiante: "",
+    id_curso: "",
+    fecha_hora_inscripcion: "",
   });
 
   const fetchInscripciones = async (pageNum = 1) => {
@@ -35,7 +34,7 @@ const Inscripciones = () => {
       setInscripciones(response.data.data);
       setPagination(response.data.pagination);
     } catch (err) {
-      console.error("Error:", err);
+      console.error("Error fetchInscripciones:", err);
     } finally {
       setLoading(false);
     }
@@ -47,10 +46,12 @@ const Inscripciones = () => {
         getEstudiantes(1, 1000, ""),
         getCursos(1, 1000, ""),
       ]);
-      setEstudiantes(estRes.data.data);
-      setCursos(curRes.data.data.filter((c) => c.id_inscripcion_estado === 1));
+      setEstudiantes(estRes.data.data || []);
+      setCursos(
+        (curRes.data.data || []).filter((c) => Number(c.id_curso_estado) === 2),
+      );
     } catch (err) {
-      console.error("Error:", err);
+      console.error("Error fetchOptions:", err);
     }
   };
 
@@ -61,41 +62,49 @@ const Inscripciones = () => {
   const openModal = (mode, data = null) => {
     if (mode === "add") {
       fetchOptions();
+      setForm({ id_estudiante: "", id_curso: "", fecha_hora_inscripcion: "" });
+    } else if (mode === "view" && data) {
+      setForm({
+        id_estudiante: data.id_estudiante ?? "",
+        id_curso: data.id_curso ?? "",
+        fecha_hora_inscripcion: data.fecha_hora_inscripcion ?? "",
+      });
     }
     setModal({ open: true, mode, data });
-    setForm(
-      data || {
-        id_estudiante: 0,
-        id_curso: 0,
-        fecha_hora_inscripcion: null,
-        id_inscripcion_estado: 1,
-      },
-    );
   };
 
   const closeModal = () => {
     setModal({ open: false, mode: "", data: null });
-    setForm({
-      id_estudiante: 0,
-      id_curso: 0,
-      fecha_hora_inscripcion: null,
-      id_inscripcion_estado: 1,
-    });
+    setForm({ id_estudiante: "", id_curso: "", fecha_hora_inscripcion: "" });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const estudianteId = Number(form.id_estudiante);
+    const cursoId = Number(form.id_curso);
+
+    if (!estudianteId || !cursoId) {
+      alert("Debe seleccionar un estudiante y un curso");
+      return;
+    }
+
     try {
+      const fechaISO = form.fecha_hora_inscripcion
+        ? new Date(form.fecha_hora_inscripcion).toISOString()
+        : new Date().toISOString();
+
       await createInscripcion({
-        id_estudiante: parseInt(form.id_estudiante),
-        id_curso: parseInt(form.id_curso),
-        fecha_hora_inscripcion:
-          form.fecha_hora_inscripcion || new Date().toISOString().split("T")[0],
+        id_estudiante: estudianteId,
+        id_curso: cursoId,
+        fecha_hora_inscripcion: fechaISO,
       });
       closeModal();
       fetchInscripciones(page);
     } catch (err) {
-      alert(err.response?.data?.error || "Error al crear inscripción");
+      const msg = err.response?.data?.error || "Error al crear inscripción";
+      alert(msg);
+      console.error("Error createInscripcion:", err.response || err);
     }
   };
 
@@ -120,7 +129,7 @@ DIPLOMA DE CURSO
 Se certifica que:
 
 ${data.estudiante.nombre} ${data.estudiante.apellido}
-DNI: ${data.estudiante.dni}
+Documento: ${data.estudiante.documento}
 
 Ha completado exitosamente el curso:
 
@@ -128,7 +137,7 @@ Ha completado exitosamente el curso:
 
 ${data.curso.descripcion || ""}
 
-Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDateString()}
+Fecha de inscripción: ${new Date(data.inscripcion.fecha_hora_inscripcion).toLocaleDateString()}
       `;
       alert(contenido);
       const ventana = window.open("", "_blank");
@@ -143,7 +152,6 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDa
     <div>
       <h2>Inscripciones</h2>
 
-      {/* Botón agregar */}
       <button
         onClick={() => openModal("add")}
         style={{ marginBottom: "20px", padding: "8px 16px" }}
@@ -151,7 +159,6 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDa
         + Nueva Inscripción
       </button>
 
-      {/* Tabla */}
       {loading ? (
         <p>Cargando...</p>
       ) : (
@@ -171,17 +178,23 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDa
           </thead>
           <tbody>
             {inscripciones.map((ins) => (
-              <tr key={ins.id}>
-                <td>{ins.id}</td>
+              <tr key={ins.id_inscripcion}>
+                <td>{ins.id_inscripcion}</td>
                 <td>
                   {ins.estudiante_apellido}, {ins.estudiante_nombre}
                 </td>
                 <td>{ins.curso_nombre}</td>
-                <td>{new Date(ins.fecha_inscripcion).toLocaleDateString()}</td>
+                <td>
+                  {new Date(ins.fecha_hora_inscripcion).toLocaleDateString()}
+                </td>
                 <td>
                   <button onClick={() => openModal("view", ins)}>Ver</button>{" "}
-                  <button onClick={() => handleDelete(ins.id)}>Eliminar</button>{" "}
-                  <button onClick={() => handleDiploma(ins.id)}>Diploma</button>
+                  <button onClick={() => handleDelete(ins.id_inscripcion)}>
+                    Eliminar
+                  </button>{" "}
+                  <button onClick={() => handleDiploma(ins.id_inscripcion)}>
+                    Diploma
+                  </button>
                 </td>
               </tr>
             ))}
@@ -189,7 +202,6 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDa
         </table>
       )}
 
-      {/* Paginación */}
       <div style={{ marginTop: "20px" }}>
         <button
           onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -208,7 +220,6 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDa
         </button>
       </div>
 
-      {/* Modal */}
       {modal.open && (
         <div
           style={{
@@ -234,6 +245,7 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDa
             <h3>
               {modal.mode === "add" ? "Nueva Inscripción" : "Ver Inscripción"}
             </h3>
+
             {modal.mode === "view" ? (
               <div>
                 <p>
@@ -245,7 +257,9 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDa
                 </p>
                 <p>
                   <strong>Fecha:</strong>{" "}
-                  {new Date(modal.data.fecha_inscripcion).toLocaleDateString()}
+                  {new Date(
+                    modal.data.fecha_hora_inscripcion,
+                  ).toLocaleDateString()}
                 </p>
               </div>
             ) : (
@@ -263,13 +277,15 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDa
                   >
                     <option value="">Seleccionar estudiante</option>
                     {estudiantes.map((est) => (
+                      // FIX: el backend devuelve "id" (alias de id_estudiante) y "nombre" (alias de nombres)
                       <option key={est.id} value={est.id}>
                         {est.apellido}, {est.nombre}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
+
+                <div style={{ marginTop: "10px" }}>
                   <label>Curso</label>
                   <br />
                   <select
@@ -282,33 +298,39 @@ Fecha de inscripción: ${new Date(data.inscripcion.fecha_inscripcion).toLocaleDa
                   >
                     <option value="">Seleccionar curso</option>
                     {cursos.map((cur) => (
-                      <option key={cur.id} value={cur.id}>
-                        {cur.nombre} (Cupo: {cur.inscriptos_max || "sin límite"}
+                      <option key={cur.id_curso} value={cur.id_curso}>
+                        {cur.nombre} (Cupo: {cur.inscriptos_max ?? "sin límite"}
                         )
                       </option>
                     ))}
                   </select>
                 </div>
-                <div>
+
+                <div style={{ marginTop: "10px" }}>
                   <label>Fecha de Inscripción</label>
                   <br />
                   <input
                     type="date"
-                    value={form.fecha_inscripcion}
+                    value={form.fecha_hora_inscripcion}
                     onChange={(e) =>
-                      setForm({ ...form, fecha_inscripcion: e.target.value })
+                      setForm({
+                        ...form,
+                        fecha_hora_inscripcion: e.target.value,
+                      })
                     }
                     style={{ padding: "8px", width: "100%" }}
                   />
                 </div>
+
                 <button
                   type="submit"
-                  style={{ marginTop: "10px", padding: "8px 16px" }}
+                  style={{ marginTop: "15px", padding: "8px 16px" }}
                 >
                   Guardar
                 </button>
               </form>
             )}
+
             <button
               onClick={closeModal}
               style={{ marginTop: "10px", padding: "8px 16px" }}

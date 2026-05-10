@@ -2,173 +2,244 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
+const toInt = (v) => {
+  const n = Number(v);
+  return Number.isNaN(n) ? null : n;
+};
+
 // GET /api/inscripciones - Listado con paginación
 router.get("/", async (req, res) => {
-  const { page = 1, limit = 10 } = req.query;
+  const page = toInt(req.query.page) || 1;
+  const limit = toInt(req.query.limit) || 10;
   const offset = (page - 1) * limit;
 
   try {
-    const query = `
-      SELECT i.*, e.nombres as estudiante_nombre, e.apellido as estudiante_apellido, 
-             c.nombre as curso_nombre
-      FROM inscripciones i
-      JOIN estudiantes e ON i.id_estudiante = e.id
-      JOIN cursos c ON i.id_curso = c.id
-      ORDER BY i.id_inscripcion LIMIT $1 OFFSET $2
-    `;
-    const countQuery = "SELECT COUNT(*) FROM inscripciones";
+    const [result, countResult] = await Promise.all([
+      pool.query(
+        `SELECT i.*,
+                e.nombres  AS estudiante_nombre,
+                e.apellido AS estudiante_apellido,
+                c.nombre   AS curso_nombre
+         FROM inscripciones i
+         JOIN estudiantes e ON i.id_estudiante = e.id_estudiante
+         JOIN cursos c      ON i.id_curso      = c.id_curso
+         ORDER BY i.id_inscripcion
+         LIMIT $1 OFFSET $2`,
+        [limit, offset],
+      ),
+      pool.query("SELECT COUNT(*) FROM inscripciones"),
+    ]);
 
-    const result = await pool.query(query, [limit, offset]);
-    const countResult = await pool.query(countQuery);
-    const total = parseInt(countResult.rows[0].count);
-
+    const total = parseInt(countResult.rows[0].count, 10);
     res.json({
       data: result.rows,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        totalPages: Math.ceil(total / limit),
-      },
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     });
   } catch (err) {
+    console.error("Error GET /api/inscripciones:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/inscripciones - Crear inscripción con validaciones
+// POST /api/inscripciones
 router.post("/", async (req, res) => {
-  const { id_estudiante, id_curso, fecha_inscripcion } = req.body;
+  const estudianteId = toInt(req.body.id_estudiante);
+  const cursoId = toInt(req.body.id_curso);
+  const fecha_hora_inscripcion = req.body.fecha_hora_inscripcion || null;
+  const usuarioId = toInt(req.user?.id);
 
-  if (!id_estudiante || !id_curso) {
+  if (!usuarioId) {
+    return res.status(401).json({ error: "Usuario no autenticado" });
+  }
+  if (
+    estudianteId === null ||
+    cursoId === null ||
+    estudianteId === 0 ||
+    cursoId === 0
+  ) {
     return res.status(400).json({ error: "Estudiante y curso son requeridos" });
   }
 
+  const client = await pool.connect();
   try {
-    // 1. Verificar si ya existe una inscripción duplicada
-    const duplicado = await pool.query(
-      "SELECT * FROM inscripciones WHERE id_estudiante = $1 AND id_curso = $2",
-      [id_estudiante, id_curso],
+    await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock($1)", [123456789]);
+
+    // Verificar duplicado
+    const dup = await client.query(
+      "SELECT 1 FROM inscripciones WHERE id_estudiante = $1 AND id_curso = $2",
+      [estudianteId, cursoId],
     );
-    if (duplicado.rows.length > 0) {
+    if (dup.rows.length > 0) {
+      await client.query("ROLLBACK");
       return res
         .status(400)
         .json({ error: "El estudiante ya está inscripto en este curso" });
     }
 
-    // 2. Verificar el curso y su cupo máximo
-    const curso = await pool.query("SELECT * FROM cursos WHERE id = $1", [
-      id_curso,
-    ]);
-    if (curso.rows.length === 0) {
+    // Verificar curso y estado
+    const cursoRes = await client.query(
+      "SELECT id_curso, inscriptos_max, id_curso_estado FROM cursos WHERE id_curso = $1",
+      [cursoId],
+    );
+    if (cursoRes.rows.length === 0) {
+      await client.query("ROLLBACK");
       return res.status(404).json({ error: "Curso no encontrado" });
     }
-
-    // 3. Verificar si la inscripción está habilitada
-    if (curso.rows[0].estado !== "activo") {
-      return res
-        .status(400)
-        .json({
-          error: "Las inscripciones no están habilitadas para este curso",
-        });
+    if (toInt(cursoRes.rows[0].id_curso_estado) !== 2) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Las inscripciones no están habilitadas para este curso",
+      });
     }
 
-    // 4. Verificar si se alcanzó el cupo máximo
-    const inscriptosActuales = await pool.query(
-      "SELECT COUNT(*) FROM inscripciones WHERE curso_id = $1",
-      [curso_id],
+    // Verificar cupo
+    const insCountRes = await client.query(
+      "SELECT COUNT(*) FROM inscripciones WHERE id_curso = $1",
+      [cursoId],
     );
-    const cantidadActual = parseInt(inscriptosActuales.rows[0].count);
-    const inscriptosMax = curso.rows[0].inscriptos_max;
-
-    if (inscriptosMax && cantidadActual >= inscriptosMax) {
+    const cantidadActual = parseInt(insCountRes.rows[0].count, 10);
+    const inscriptosMax =
+      cursoRes.rows[0].inscriptos_max !== null
+        ? Number(cursoRes.rows[0].inscriptos_max)
+        : null;
+    if (inscriptosMax !== null && cantidadActual >= inscriptosMax) {
+      await client.query("ROLLBACK");
       return res
         .status(400)
         .json({ error: "No hay cupo disponible en este curso" });
     }
 
-    // 5. Crear la inscripción
-    const result = await pool.query(
-      "INSERT INTO inscripciones (estudiante_id, curso_id, fecha_inscripcion) VALUES ($1, $2, $3) RETURNING *",
-      [estudiante_id, curso_id, fecha_inscripcion || new Date()],
+    // Verificar estudiante activo
+    const estRes = await client.query(
+      "SELECT id_estudiante FROM estudiantes WHERE id_estudiante = $1 AND activo = 1",
+      [estudianteId],
     );
-    res.json({ success: true, data: result.rows[0] });
+    if (estRes.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res
+        .status(404)
+        .json({ error: "Estudiante no encontrado o inactivo" });
+    }
+
+    // INSERT — id_inscripcion es serial, Postgres lo maneja solo
+    const insertRes = await client.query(
+      `INSERT INTO inscripciones
+         (id_curso, id_estudiante, fecha_hora_inscripcion, id_inscripcion_estado, id_usuario_modificacion, fecha_hora_modificacion)
+       VALUES ($1, $2, COALESCE($3, NOW()), 1, $4, NOW())
+       RETURNING *`,
+      [cursoId, estudianteId, fecha_hora_inscripcion, usuarioId],
+    );
+
+    await client.query("COMMIT");
+    return res.status(201).json({ success: true, data: insertRes.rows[0] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    await client.query("ROLLBACK");
+    console.error("Error POST /api/inscripciones:", err.stack || err);
+    if (err.code === "23505") {
+      return res
+        .status(400)
+        .json({ error: "El estudiante ya está inscripto en este curso" });
+    }
+    return res
+      .status(500)
+      .json({ error: err.message || "Error interno del servidor" });
+  } finally {
+    client.release();
   }
 });
 
-// GET /api/inscripciones/:id - Ver inscripción
+// GET /api/inscripciones/:id
 router.get("/:id", async (req, res) => {
+  const id = toInt(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID inválido" });
+
   try {
-    const query = `
-      SELECT i.*, e.nombres as estudiante_nombre, e.apellido as estudiante_apellido, 
-             e.dni as estudiante_dni, c.nombre as curso_nombre, c.descripcion as curso_descripcion
-      FROM inscripciones i
-      JOIN estudiantes e ON i.id_estudiante = e.id
-      JOIN cursos c ON i.id_curso = c.id
-      WHERE i.id = $1
-    `;
-    const result = await pool.query(query, [req.params.id]);
+    const result = await pool.query(
+      `SELECT i.*,
+              e.nombres    AS estudiante_nombre,
+              e.apellido   AS estudiante_apellido,
+              e.documento  AS estudiante_documento,
+              c.nombre     AS curso_nombre,
+              c.descripcion AS curso_descripcion
+       FROM inscripciones i
+       JOIN estudiantes e ON i.id_estudiante = e.id_estudiante
+       JOIN cursos c      ON i.id_curso      = c.id_curso
+       WHERE i.id_inscripcion = $1`,
+      [id],
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Inscripción no encontrada" });
     }
     res.json({ data: result.rows[0] });
   } catch (err) {
+    console.error("Error GET /api/inscripciones/:id", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// DELETE /api/inscripciones/:id - Eliminar inscripción
+// DELETE /api/inscripciones/:id
 router.delete("/:id", async (req, res) => {
+  const id = toInt(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID inválido" });
+
   try {
     const result = await pool.query(
-      "DELETE FROM inscripciones WHERE id = $1 RETURNING *",
-      [req.params.id],
+      "DELETE FROM inscripciones WHERE id_inscripcion = $1 RETURNING *",
+      [id],
     );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Inscripción no encontrada" });
     }
     res.json({ success: true, message: "Inscripción eliminada" });
   } catch (err) {
+    console.error("Error DELETE /api/inscripciones/:id", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/inscripciones/:id/diploma - Generar diploma individual
+// GET /api/inscripciones/:id/diploma
 router.get("/:id/diploma", async (req, res) => {
+  const id = toInt(req.params.id);
+  if (!id) return res.status(400).json({ error: "ID inválido" });
+
   try {
-    const query = `
-      SELECT i.*, e.nombres as estudiante_nombre, e.apellido as estudiante_apellido, 
-             e.dni as estudiante_dni, c.nombre as curso_nombre, c.descripcion as curso_descripcion
-      FROM inscripciones i
-      JOIN estudiantes e ON i.id_estudiante = e.id
-      JOIN cursos c ON i.id_curso = c.id
-      WHERE i.id_inscripcion = $1
-    `;
-    const result = await pool.query(query, [req.params.id]);
+    const result = await pool.query(
+      `SELECT i.*,
+              e.nombres    AS estudiante_nombre,
+              e.apellido   AS estudiante_apellido,
+              e.documento  AS estudiante_documento,
+              c.nombre     AS curso_nombre,
+              c.descripcion AS curso_descripcion
+       FROM inscripciones i
+       JOIN estudiantes e ON i.id_estudiante = e.id_estudiante
+       JOIN cursos c      ON i.id_curso      = c.id_curso
+       WHERE i.id_inscripcion = $1`,
+      [id],
+    );
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Inscripción no encontrada" });
     }
 
-    // Devuelve los datos para generar el diploma
+    const row = result.rows[0];
     res.json({
       success: true,
       data: {
-        inscripcion: result.rows[0],
+        inscripcion: row,
         estudiante: {
-          nombre: result.rows[0].estudiante_nombre,
-          apellido: result.rows[0].estudiante_apellido,
-          dni: result.rows[0].estudiante_dni,
+          nombre: row.estudiante_nombre,
+          apellido: row.estudiante_apellido,
+          documento: row.estudiante_documento,
         },
         curso: {
-          nombre: result.rows[0].curso_nombre,
-          descripcion: result.rows[0].curso_descripcion,
+          nombre: row.curso_nombre,
+          descripcion: row.curso_descripcion,
         },
         fecha: new Date(),
       },
     });
   } catch (err) {
+    console.error("Error GET /api/inscripciones/:id/diploma", err);
     res.status(500).json({ error: err.message });
   }
 });
