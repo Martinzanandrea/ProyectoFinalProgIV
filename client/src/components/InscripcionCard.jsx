@@ -5,9 +5,18 @@ const ESTADOS = {
   2: { label: "Cancelada",  bg: "bg-red-100",     text: "text-red-600",     dot: "bg-red-400"     },
 };
 
-const InscripcionCard = ({ inscripcion, onCancelar, onDelete, onDiploma }) => {
+const InscripcionCard = ({  inscripcion,
+  onCancelar,
+  onDelete,
+  onDiploma,
+}) => {
+  if (!inscripcion) return null;
+
   const estado = ESTADOS[inscripcion.id_inscripcion_estado] ?? {
-    label: "Desconocido", bg: "bg-slate-100", text: "text-slate-500", dot: "bg-slate-400",
+    label: "Desconocido",
+    bg: "bg-slate-100",
+    text: "text-slate-500",
+    dot: "bg-slate-400",
   };
   const esCancelada = inscripcion.id_inscripcion_estado === 2;
 
