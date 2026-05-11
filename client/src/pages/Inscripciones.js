@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import DataTable from "../components/DataTable";
+import Modal from "../components/Modal";
 import {
   getInscripciones,
   createInscripcion,
@@ -10,10 +12,290 @@ import {
 import axios from "axios";
 
 const ESTADOS = {
-  1: { label: "Confirmada", color: "#27ae60" },
-  2: { label: "Cancelada", color: "#e74c3c" },
+  1: {
+    label: "Confirmada",
+    bg: "bg-emerald-100",
+    text: "text-emerald-700",
+    dot: "bg-emerald-500",
+  },
+  2: {
+    label: "Cancelada",
+    bg: "bg-red-100",
+    text: "text-red-600",
+    dot: "bg-red-400",
+  },
 };
 
+// ─── Fila de la tabla ─────────────────────────────────────────────────────────
+const InscripcionRow = ({
+  inscripcion,
+  onCancelar,
+  onDelete,
+  onDiploma,
+  onView,
+}) => {
+  const estado = ESTADOS[inscripcion.id_inscripcion_estado];
+  const esCancelada = inscripcion.id_inscripcion_estado === 2;
+
+  return (
+    <>
+      <td className="px-5 py-3.5 text-xs font-mono text-slate-400">
+        #{inscripcion.id_inscripcion}
+      </td>
+      <td className="px-5 py-3.5 text-sm font-semibold text-slate-800">
+        {inscripcion.estudiante_apellido}, {inscripcion.estudiante_nombre}
+      </td>
+      <td className="px-5 py-3.5 text-sm text-slate-600 max-w-[200px]">
+        <span className="truncate block">{inscripcion.curso_nombre}</span>
+      </td>
+      <td className="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">
+        {new Date(inscripcion.fecha_hora_inscripcion).toLocaleDateString(
+          "es-AR",
+        )}
+      </td>
+      <td className="px-5 py-3.5">
+        {estado && (
+          <span
+            className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full ${estado.bg} ${estado.text}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${estado.dot}`} />
+            {estado.label}
+          </span>
+        )}
+      </td>
+      <td className="px-5 py-3.5">
+        <div className="flex items-center gap-1.5">
+          {/* Ver detalle */}
+          <button
+            onClick={onView}
+            title="Ver detalle"
+            className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
+          >
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+              />
+            </svg>
+          </button>
+
+          {!esCancelada && (
+            <>
+              {/* Diploma */}
+              <button
+                onClick={() => onDiploma(inscripcion.id_inscripcion)}
+                title="Descargar diploma"
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
+              </button>
+              {/* Cancelar */}
+              <button
+                onClick={() => onCancelar(inscripcion.id_inscripcion)}
+                title="Cancelar inscripción"
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
+              >
+                <svg
+                  className="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </>
+          )}
+
+          {esCancelada && (
+            <button
+              onClick={() => onDelete(inscripcion.id_inscripcion)}
+              title="Eliminar"
+              className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
+      </td>
+    </>
+  );
+};
+
+// ─── Formulario nueva inscripción ─────────────────────────────────────────────
+const InscripcionForm = ({ form, setForm, estudiantes, cursos, onSubmit }) => (
+  <form onSubmit={onSubmit} className="space-y-5">
+    <div className="grid sm:grid-cols-2 gap-4">
+      <div>
+        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+          Estudiante
+        </label>
+        <select
+          value={form.id_estudiante}
+          onChange={(e) => setForm({ ...form, id_estudiante: e.target.value })}
+          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
+          required
+        >
+          <option value="">Seleccionar estudiante...</option>
+          {estudiantes.map((est) => (
+            <option key={est.id} value={est.id}>
+              {est.apellido}, {est.nombre} — {est.dni}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+          Curso abierto
+        </label>
+        <select
+          value={form.id_curso}
+          onChange={(e) => setForm({ ...form, id_curso: e.target.value })}
+          className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
+          required
+        >
+          <option value="">Seleccionar curso...</option>
+          {cursos.map((cur) => (
+            <option key={cur.id_curso} value={cur.id_curso}>
+              {cur.nombre}
+              {cur.inscriptos_max ? ` (Cupo: ${cur.inscriptos_max})` : ""}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+        Fecha de inscripción
+        <span className="text-slate-400 font-normal ml-1 normal-case">
+          (opcional — por defecto hoy)
+        </span>
+      </label>
+      <input
+        type="datetime-local"
+        value={form.fecha_hora_inscripcion}
+        onChange={(e) =>
+          setForm({ ...form, fecha_hora_inscripcion: e.target.value })
+        }
+        className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
+      />
+    </div>
+
+    <div className="pt-1">
+      <button
+        type="submit"
+        className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+        style={{ background: "#0f2a5e" }}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "#1e3a6e")}
+        onMouseLeave={(e) => (e.currentTarget.style.background = "#0f2a5e")}
+      >
+        Confirmar inscripción
+      </button>
+    </div>
+  </form>
+);
+
+// ─── Modal ver detalle ────────────────────────────────────────────────────────
+const InscripcionView = ({ inscripcion }) => {
+  if (!inscripcion) return null;
+  const estado = ESTADOS[inscripcion.id_inscripcion_estado];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between py-3 border-b border-slate-100">
+        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+          ID
+        </span>
+        <span className="text-sm font-mono font-semibold text-slate-700">
+          #{inscripcion.id_inscripcion}
+        </span>
+      </div>
+      <div className="flex items-center justify-between py-3 border-b border-slate-100">
+        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+          Estudiante
+        </span>
+        <span className="text-sm font-semibold text-slate-800">
+          {inscripcion.estudiante_apellido}, {inscripcion.estudiante_nombre}
+        </span>
+      </div>
+      <div className="flex items-center justify-between py-3 border-b border-slate-100">
+        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+          Curso
+        </span>
+        <span className="text-sm font-semibold text-slate-800">
+          {inscripcion.curso_nombre}
+        </span>
+      </div>
+      <div className="flex items-center justify-between py-3 border-b border-slate-100">
+        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+          Fecha
+        </span>
+        <span className="text-sm text-slate-600">
+          {new Date(inscripcion.fecha_hora_inscripcion).toLocaleString("es-AR")}
+        </span>
+      </div>
+      <div className="flex items-center justify-between py-3">
+        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+          Estado
+        </span>
+        {estado && (
+          <span
+            className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full ${estado.bg} ${estado.text}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${estado.dot}`} />
+            {estado.label}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ─── Página principal ─────────────────────────────────────────────────────────
 const Inscripciones = () => {
   const [inscripciones, setInscripciones] = useState([]);
   const [estudiantes, setEstudiantes] = useState([]);
@@ -22,9 +304,8 @@ const Inscripciones = () => {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
-    total: 0,
     totalPages: 0,
+    total: 0,
   });
   const [modal, setModal] = useState({ open: false, mode: "", data: null });
   const [form, setForm] = useState({
@@ -33,18 +314,18 @@ const Inscripciones = () => {
     fecha_hora_inscripcion: "",
   });
 
-  const fetchInscripciones = async (pageNum = 1) => {
+  const fetchInscripciones = useCallback(async (pageNum = 1) => {
     setLoading(true);
     try {
-      const response = await getInscripciones(pageNum, 10);
-      setInscripciones(response.data.data);
-      setPagination(response.data.pagination);
+      const res = await getInscripciones(pageNum, 10);
+      setInscripciones(res.data.data);
+      setPagination(res.data.pagination);
     } catch (err) {
-      console.error("Error fetchInscripciones:", err);
+      console.error("Error:", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const fetchOptions = async () => {
     try {
@@ -57,77 +338,61 @@ const Inscripciones = () => {
         (curRes.data.data || []).filter((c) => Number(c.id_curso_estado) === 2),
       );
     } catch (err) {
-      console.error("Error fetchOptions:", err);
+      console.error("Error options:", err);
     }
   };
 
   useEffect(() => {
     fetchInscripciones(page);
-  }, [page]);
+  }, [page, fetchInscripciones]);
 
   const openModal = (mode, data = null) => {
     if (mode === "add") {
       fetchOptions();
       setForm({ id_estudiante: "", id_curso: "", fecha_hora_inscripcion: "" });
-    } else if (mode === "view" && data) {
-      setForm({
-        id_estudiante: data.id_estudiante ?? "",
-        id_curso: data.id_curso ?? "",
-        fecha_hora_inscripcion: data.fecha_hora_inscripcion ?? "",
-      });
     }
     setModal({ open: true, mode, data });
   };
 
-  const closeModal = () => {
-    setModal({ open: false, mode: "", data: null });
-    setForm({ id_estudiante: "", id_curso: "", fecha_hora_inscripcion: "" });
-  };
+  const closeModal = () => setModal({ open: false, mode: "", data: null });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const estudianteId = Number(form.id_estudiante);
-    const cursoId = Number(form.id_curso);
-    if (!estudianteId || !cursoId) {
-      alert("Debe seleccionar un estudiante y un curso");
-      return;
-    }
+    if (!Number(form.id_estudiante) || !Number(form.id_curso))
+      return alert("Seleccioná estudiante y curso");
     try {
       const fechaISO = form.fecha_hora_inscripcion
         ? new Date(form.fecha_hora_inscripcion).toISOString()
         : new Date().toISOString();
       await createInscripcion({
-        id_estudiante: estudianteId,
-        id_curso: cursoId,
+        id_estudiante: Number(form.id_estudiante),
+        id_curso: Number(form.id_curso),
         fecha_hora_inscripcion: fechaISO,
       });
       closeModal();
       fetchInscripciones(page);
     } catch (err) {
-      alert(err.response?.data?.error || "Error al crear inscripción");
+      alert(err.response?.data?.error || "Error al crear");
     }
   };
 
-  // Cancelar una inscripción ya existente desde la tabla
   const handleCancelar = async (id) => {
-    if (window.confirm("¿Cancelar esta inscripción?")) {
-      try {
-        await cancelarInscripcion(id);
-        fetchInscripciones(page);
-      } catch (err) {
-        alert(err.response?.data?.error || "Error al cancelar");
-      }
+    if (!window.confirm("¿Cancelar esta inscripción?")) return;
+    try {
+      await cancelarInscripcion(id);
+      fetchInscripciones(page);
+    } catch {
+      alert("Error al cancelar");
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("¿Está seguro de eliminar esta inscripción?")) {
-      try {
-        await deleteInscripcion(id);
-        fetchInscripciones(page);
-      } catch (err) {
-        alert(err.response?.data?.error || "Error al eliminar");
-      }
+    if (!window.confirm("¿Eliminar definitivamente esta inscripción?")) return;
+    try {
+      await deleteInscripcion(id);
+      fetchInscripciones(page);
+    } catch {
+      alert("Error al eliminar");
     }
   };
 
@@ -141,264 +406,101 @@ const Inscripciones = () => {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
-      link.setAttribute(
-        "download",
-        `diploma_inscripcion_${id_inscripcion}.pdf`,
-      );
-      document.body.appendChild(link);
+      link.download = `diploma_${id_inscripcion}.pdf`;
       link.click();
-      link.remove();
-    } catch (error) {
-      console.error("Error descargando diploma:", error);
-      alert("Error al descargar el diploma");
+    } catch {
+      alert("Error al generar el diploma");
     }
   };
 
   return (
-    <div>
-      <h2>Inscripciones</h2>
-
-      <button
-        onClick={() => openModal("add")}
-        style={{ marginBottom: "20px", padding: "8px 16px" }}
-      >
-        + Nueva Inscripción
-      </button>
-
-      {loading ? (
-        <p>Cargando...</p>
-      ) : (
-        <table
-          border="1"
-          cellPadding="8"
-          style={{ width: "100%", borderCollapse: "collapse" }}
-        >
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Estudiante</th>
-              <th>Curso</th>
-              <th>Fecha</th>
-              <th>Estado</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {inscripciones.map((ins) => {
-              const estado = ESTADOS[ins.id_inscripcion_estado] || {
-                label: "Desconocido",
-                color: "#999",
-              };
-              const esCancelada = ins.id_inscripcion_estado === 2;
-              return (
-                <tr
-                  key={ins.id_inscripcion}
-                  style={{ background: esCancelada ? "#fdf0f0" : "white" }}
-                >
-                  <td>{ins.id_inscripcion}</td>
-                  <td>
-                    {ins.estudiante_apellido}, {ins.estudiante_nombre}
-                  </td>
-                  <td>{ins.curso_nombre}</td>
-                  <td>
-                    {new Date(ins.fecha_hora_inscripcion).toLocaleDateString()}
-                  </td>
-                  <td>
-                    <span
-                      style={{
-                        color: estado.color,
-                        fontWeight: "bold",
-                        padding: "2px 8px",
-                        borderRadius: "4px",
-                        border: `1px solid ${estado.color}`,
-                        fontSize: "12px",
-                      }}
-                    >
-                      {estado.label}
-                    </span>
-                  </td>
-                  <td>
-                    <button onClick={() => openModal("view", ins)}>Ver</button>{" "}
-                    {/* Solo mostrar Cancelar si está Confirmada */}
-                    {!esCancelada && (
-                      <button
-                        onClick={() => handleCancelar(ins.id_inscripcion)}
-                        style={{ color: "#e74c3c" }}
-                      >
-                        Cancelar
-                      </button>
-                    )}{" "}
-                    {/* Eliminar solo visible en canceladas */}
-                    {esCancelada && (
-                      <button
-                        onClick={() => handleDelete(ins.id_inscripcion)}
-                        style={{ color: "#c0392b", fontWeight: "bold" }}
-                      >
-                        Eliminar
-                      </button>
-                    )}{" "}
-                    {/* Diploma solo para confirmadas */}
-                    {!esCancelada && (
-                      <button onClick={() => handleDiploma(ins.id_inscripcion)}>
-                        📄 Diploma PDF
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-
-      <div style={{ marginTop: "20px" }}>
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-        >
-          Anterior
-        </button>
-        <span style={{ margin: "0 10px" }}>
-          Página {pagination.page} de {pagination.totalPages}
-        </span>
-        <button
-          onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-          disabled={page >= pagination.totalPages}
-        >
-          Siguiente
-        </button>
+    <div
+      className="md:ml-56 min-h-screen flex flex-col"
+      style={{ background: "#f8fafc" }}
+    >
+      {/* Page header */}
+      <div style={{ background: "#0f2a5e" }} className="px-8 pt-8 pb-10">
+        <h1 className="text-2xl font-bold text-white tracking-tight">
+          Inscripciones
+        </h1>
+        <p className="text-white/40 text-xs mt-1">
+          Gestión de inscripciones y diplomas
+        </p>
       </div>
 
-      {modal.open && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <div
-            style={{
-              background: "white",
-              padding: "20px",
-              borderRadius: "8px",
-              minWidth: "400px",
-            }}
+      {/* Contenido */}
+      <div className="px-6 md:px-8 -mt-4 flex-1 pb-10 space-y-5">
+        {/* Barra de acciones */}
+        <div className="flex items-center justify-between">
+          <div /> {/* espacio para filtros futuros */}
+          <button
+            onClick={() => openModal("add")}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+            style={{ background: "#0f2a5e" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#1e3a6e")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#0f2a5e")}
           >
-            <h3>
-              {modal.mode === "add" ? "Nueva Inscripción" : "Ver Inscripción"}
-            </h3>
-
-            {modal.mode === "view" ? (
-              <div>
-                <p>
-                  <strong>Estudiante:</strong> {modal.data.estudiante_apellido},{" "}
-                  {modal.data.estudiante_nombre}
-                </p>
-                <p>
-                  <strong>Curso:</strong> {modal.data.curso_nombre}
-                </p>
-                <p>
-                  <strong>Fecha:</strong>{" "}
-                  {new Date(
-                    modal.data.fecha_hora_inscripcion,
-                  ).toLocaleDateString()}
-                </p>
-                <p>
-                  <strong>Estado:</strong>{" "}
-                  <span
-                    style={{
-                      color: ESTADOS[modal.data.id_inscripcion_estado]?.color,
-                      fontWeight: "bold",
-                    }}
-                  >
-                    {ESTADOS[modal.data.id_inscripcion_estado]?.label}
-                  </span>
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit}>
-                <div>
-                  <label>Estudiante</label>
-                  <br />
-                  <select
-                    value={form.id_estudiante}
-                    onChange={(e) =>
-                      setForm({ ...form, id_estudiante: e.target.value })
-                    }
-                    required
-                    style={{ width: "100%", padding: "8px" }}
-                  >
-                    <option value="">Seleccionar estudiante</option>
-                    {estudiantes.map((est) => (
-                      <option key={est.id} value={est.id}>
-                        {est.apellido}, {est.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ marginTop: "10px" }}>
-                  <label>Curso</label>
-                  <br />
-                  <select
-                    value={form.id_curso}
-                    onChange={(e) =>
-                      setForm({ ...form, id_curso: e.target.value })
-                    }
-                    required
-                    style={{ width: "100%", padding: "8px" }}
-                  >
-                    <option value="">Seleccionar curso</option>
-                    {cursos.map((cur) => (
-                      <option key={cur.id_curso} value={cur.id_curso}>
-                        {cur.nombre} (Cupo: {cur.inscriptos_max ?? "sin límite"}
-                        )
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div style={{ marginTop: "10px" }}>
-                  <label>Fecha de Inscripción</label>
-                  <br />
-                  <input
-                    type="date"
-                    value={form.fecha_hora_inscripcion}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        fecha_hora_inscripcion: e.target.value,
-                      })
-                    }
-                    style={{ padding: "8px", width: "100%" }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  style={{ marginTop: "15px", padding: "8px 16px" }}
-                >
-                  Guardar
-                </button>
-              </form>
-            )}
-
-            <button
-              onClick={closeModal}
-              style={{ marginTop: "10px", padding: "8px 16px" }}
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              Cerrar
-            </button>
-          </div>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+            Nueva inscripción
+          </button>
         </div>
-      )}
+
+        {/* Tabla */}
+        <DataTable
+          columns={["#", "Estudiante", "Curso", "Fecha", "Estado", "Acciones"]}
+          data={inscripciones}
+          loading={loading}
+          pagination={pagination}
+          onPageChange={setPage}
+        >
+          {(inscripcion) => (
+            <InscripcionRow
+              inscripcion={inscripcion}
+              onCancelar={handleCancelar}
+              onDelete={handleDelete}
+              onDiploma={handleDiploma}
+              onView={() => openModal("view", inscripcion)}
+            />
+          )}
+        </DataTable>
+      </div>
+
+      {/* Modal — nueva inscripción */}
+      <Modal
+        isOpen={modal.open && modal.mode === "add"}
+        onClose={closeModal}
+        title="Nueva inscripción"
+        size="lg"
+      >
+        <InscripcionForm
+          form={form}
+          setForm={setForm}
+          estudiantes={estudiantes}
+          cursos={cursos}
+          onSubmit={handleSubmit}
+        />
+      </Modal>
+
+      {/* Modal — detalle */}
+      <Modal
+        isOpen={modal.open && modal.mode === "view"}
+        onClose={closeModal}
+        title="Detalle de inscripción"
+      >
+        <InscripcionView inscripcion={modal.data} />
+      </Modal>
     </div>
   );
 };

@@ -67,13 +67,36 @@ router.get("/stats/total", async (req, res) => {
   }
 });
 
-// GET /api/cursos/stats/activos
+// GET /api/cursos/stats/activos — FIX: incluye inscriptos_actual
 router.get("/stats/activos", async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT * FROM cursos WHERE id_curso_estado = 2 ORDER BY fecha_inicio`,
+      `SELECT c.*,
+              COUNT(i.id_inscripcion) FILTER (WHERE i.id_inscripcion_estado = 1) AS inscriptos_actual
+       FROM cursos c
+       LEFT JOIN inscripciones i ON i.id_curso = c.id_curso
+       WHERE c.id_curso_estado = 2
+       GROUP BY c.id_curso
+       ORDER BY c.fecha_inicio`,
     );
-    res.json({ data: result.rows.map(toCursoOutputDTO) });
+    res.json({
+      data: result.rows.map((row) => ({
+        ...toCursoOutputDTO(row),
+        inscriptos_actual: parseInt(row.inscriptos_actual, 10) || 0,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/cursos/stats/inscriptos-totales — total de inscriptos confirmados
+router.get("/stats/inscriptos-totales", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT COUNT(*) FROM inscripciones WHERE id_inscripcion_estado = 1",
+    );
+    res.json({ total: parseInt(result.rows[0].count, 10) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -262,7 +285,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/cursos/:id — SOFT DELETE: cambia estado a 4 (ELIMINADO)
+// DELETE /api/cursos/:id — SOFT DELETE: estado 4
 router.delete("/:id", async (req, res) => {
   const id = toInt(req.params.id);
   if (!id) return res.status(400).json({ error: "ID inválido" });

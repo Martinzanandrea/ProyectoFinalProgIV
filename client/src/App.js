@@ -14,13 +14,11 @@ import Inscripciones from "./pages/Inscripciones";
 import "./App.css";
 
 function App() {
-  // FIX: inicializar desde localStorage para sobrevivir re-renders y F5
   const [isAuthenticated, setIsAuthenticated] = useState(
     () => !!localStorage.getItem("token"),
   );
 
   const handleLogin = (token, user) => {
-    // FIX: guardar token y user en localStorage
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(user));
     setIsAuthenticated(true);
@@ -34,41 +32,52 @@ function App() {
 
   return (
     <Router>
-      {isAuthenticated && <Navbar onLogout={handleLogout} />}
-      <div style={{ padding: 20 }}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/login" />} />
-          <Route
-            path="/login"
-            element={
-              isAuthenticated ? (
-                <Navigate to="/dashboard" />
-              ) : (
-                <Login onLogin={handleLogin} />
-              )
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/estudiantes"
-            element={
-              isAuthenticated ? <Estudiantes /> : <Navigate to="/login" />
-            }
-          />
-          <Route
-            path="/cursos"
-            element={isAuthenticated ? <Cursos /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/inscripciones"
-            element={
-              isAuthenticated ? <Inscripciones /> : <Navigate to="/login" />
-            }
-          />
-        </Routes>
+      <div className="flex-1">
+        {/* Sidebar — solo cuando está autenticado */}
+        {isAuthenticated && <Navbar onLogout={handleLogout} />}
+
+        {/* Contenido principal
+            md:ml-60 empuja el contenido a la derecha del sidebar en desktop
+            mt-14 en mobile para no quedar tapado por el topbar */}
+        <main
+          className={`flex-1 ${isAuthenticated ? "md:ml-30 mt-14 md:mt-0" : ""}`}
+        >
+          <Routes>
+            <Route path="/" element={<Navigate to="/login" />} />
+            <Route
+              path="/login"
+              element={
+                isAuthenticated ? (
+                  <Navigate to="/dashboard" />
+                ) : (
+                  <Login onLogin={handleLogin} />
+                )
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                isAuthenticated ? <Dashboard /> : <Navigate to="/login" />
+              }
+            />
+            <Route
+              path="/estudiantes"
+              element={
+                isAuthenticated ? <Estudiantes /> : <Navigate to="/login" />
+              }
+            />
+            <Route
+              path="/cursos"
+              element={isAuthenticated ? <Cursos /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/inscripciones"
+              element={
+                isAuthenticated ? <Inscripciones /> : <Navigate to="/login" />
+              }
+            />
+          </Routes>
+        </main>
       </div>
     </Router>
   );
