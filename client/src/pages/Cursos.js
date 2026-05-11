@@ -377,7 +377,7 @@ const Cursos = () => {
 
   return (
     <div
-      className="md:ml-56 min-h-screen flex flex-col"
+      className="min-h-screen flex flex-col"
       style={{ background: "#f8fafc" }}
     >
       {/* Page header */}

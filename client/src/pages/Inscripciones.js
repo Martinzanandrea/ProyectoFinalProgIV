@@ -180,8 +180,8 @@ const InscripcionForm = ({ form, setForm, estudiantes, cursos, onSubmit }) => (
         >
           <option value="">Seleccionar estudiante...</option>
           {estudiantes.map((est) => (
-            <option key={est.id} value={est.id}>
-              {est.apellido}, {est.nombre} — {est.dni}
+            <option key={est.id_estudiante} value={est.id_estudiante}>
+              {est.apellido}, {est.nombres} — {est.documento}
             </option>
           ))}
         </select>
@@ -415,7 +415,7 @@ const Inscripciones = () => {
 
   return (
     <div
-      className="md:ml-56 min-h-screen flex flex-col"
+      className="min-h-screen flex flex-col"
       style={{ background: "#f8fafc" }}
     >
       {/* Page header */}

@@ -45,7 +45,11 @@ const DataTable = ({ columns, data, loading, pagination, onPageChange, children 
             ) : (
               data.map((row, i) => (
                 <tr
-                  key={row.id_curso ?? row.id ?? i}
+                  key={      row.id_inscripcion ??
+      row.id_curso ??
+      row.id_estudiante ??
+      row.id ??
+      i}
                   className="hover:bg-slate-50 transition-colors duration-100"
                 >
                   {children(row)}

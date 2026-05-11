@@ -26,17 +26,25 @@ const Estudiantes = () => {
     totalPages: 0,
     total: 0,
   });
-  const [modal, setModal] = useState({ open: false, mode: "", data: null });
+
+  const [modal, setModal] = useState({
+    open: false,
+    mode: "",
+    data: null,
+  });
+
   const [form, setForm] = useState(FORM_EMPTY);
 
   const fetchEstudiantes = useCallback(async (pageNum = 1, searchTerm = "") => {
     setLoading(true);
+
     try {
       const response = await getEstudiantes(pageNum, 10, searchTerm);
+
       setEstudiantes(response.data.data);
       setPagination(response.data.pagination);
     } catch (err) {
-      console.error("Error:", err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -51,8 +59,30 @@ const Estudiantes = () => {
     return new Date(dateString).toISOString().split("T")[0];
   };
 
+  const calcularEdad = (fechaNac) => {
+    if (!fechaNac) return "—";
+
+    const hoy = new Date();
+    const nac = new Date(fechaNac);
+
+    let edad = hoy.getFullYear() - nac.getFullYear();
+
+    const m = hoy.getMonth() - nac.getMonth();
+
+    if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) {
+      edad--;
+    }
+
+    return edad;
+  };
+
   const openModal = (mode, data = null) => {
-    setModal({ open: true, mode, data });
+    setModal({
+      open: true,
+      mode,
+      data,
+    });
+
     setForm(
       data
         ? {
@@ -67,18 +97,25 @@ const Estudiantes = () => {
   };
 
   const closeModal = () => {
-    setModal({ open: false, mode: "", data: null });
+    setModal({
+      open: false,
+      mode: "",
+      data: null,
+    });
+
     setForm(FORM_EMPTY);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     try {
       if (modal.mode === "add") {
         await createEstudiante(form);
       } else if (modal.mode === "edit") {
         await updateEstudiante(modal.data.id, form);
       }
+
       closeModal();
       fetchEstudiantes(page, search);
     } catch (err) {
@@ -87,39 +124,37 @@ const Estudiantes = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("¿Eliminar este estudiante?")) {
-      try {
-        await deleteEstudiante(id);
-        fetchEstudiantes(page, search);
-      } catch (err) {
-        alert(err.response?.data?.error || "Error al eliminar");
-      }
+    if (!window.confirm("¿Eliminar este estudiante?")) return;
+
+    try {
+      await deleteEstudiante(id);
+      fetchEstudiantes(page, search);
+    } catch (err) {
+      alert(err.response?.data?.error || "Error al eliminar");
     }
   };
 
-  const calcularEdad = (fechaNac) => {
-    if (!fechaNac) return "—";
-    const hoy = new Date();
-    const nac = new Date(fechaNac);
-    let edad = hoy.getFullYear() - nac.getFullYear();
-    const m = hoy.getMonth() - nac.getMonth();
-    if (m < 0 || (m === 0 && hoy.getDate() < nac.getDate())) edad--;
-    return edad;
-  };
-
   return (
-    <div className="min-h-screen bg-slate-50">
-      {/* Franja institucional */}
-      <div className="bg-blue-900 text-white px-6 py-4">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-lg font-bold">Gestión de Estudiantes</h2>
-          <p className="text-blue-300 text-xs">Administración de alumnos</p>
-        </div>
+    <div
+      className="min-h-screen flex flex-col"
+      style={{ background: "#f8fafc" }}
+    >
+      {/* Header */}
+      <div style={{ background: "#0f2a5e" }} className="px-8 pt-8 pb-10">
+        <h1 className="text-2xl font-bold text-white tracking-tight">
+          Estudiantes
+        </h1>
+
+        <p className="text-white/40 text-xs mt-1">
+          Gestión y administración de alumnos
+        </p>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Buscador + botón */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+      {/* Content */}
+      <div className="px-6 md:px-8 -mt-4 flex-1 pb-10 space-y-5">
+        {/* Actions */}
+        <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+          {/* Search */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -133,33 +168,52 @@ const Estudiantes = () => {
               placeholder="Buscar por nombre, apellido o DNI..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-white"
+              className="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
             />
+
             <button
               type="submit"
-              className="px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold rounded-lg transition-all"
+              className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+              style={{ background: "#0f2a5e" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "#1e3a6e")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "#0f2a5e")
+              }
             >
               Buscar
             </button>
           </form>
+
+          {/* Add */}
           <button
             onClick={() => openModal("add")}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-all whitespace-nowrap"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+            style={{ background: "#0f2a5e" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#1e3a6e")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "#0f2a5e")}
           >
-            + Nuevo Estudiante
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+            Nuevo estudiante
           </button>
         </div>
 
-        {/* Tabla */}
+        {/* Table */}
         <DataTable
-          columns={[
-            "ID",
-            "Apellido y Nombre",
-            "DNI",
-            "Email",
-            "Edad",
-            "Acciones",
-          ]}
+          columns={["#", "Estudiante", "DNI", "Email", "Edad", "Acciones"]}
           data={estudiantes}
           loading={loading}
           pagination={pagination}
@@ -167,44 +221,54 @@ const Estudiantes = () => {
         >
           {(est) => (
             <>
-              <td className="px-6 py-4 text-sm font-mono text-slate-500">
+              <td className="px-5 py-3.5 text-xs font-mono text-slate-400">
                 #{est.id}
               </td>
-              <td className="px-6 py-4">
-                <div className="font-semibold text-slate-900">
+
+              <td className="px-5 py-3.5">
+                <div className="font-semibold text-slate-800">
                   {est.apellido}, {est.nombre}
                 </div>
               </td>
-              <td className="px-6 py-4 text-sm font-mono text-slate-700">
+
+              <td className="px-5 py-3.5 text-sm font-mono text-slate-600">
                 {est.dni}
               </td>
-              <td className="px-6 py-4 text-sm text-slate-600 max-w-[200px] truncate">
-                {est.email}
+
+              <td className="px-5 py-3.5 text-sm text-slate-500 max-w-[220px]">
+                <span className="truncate block">{est.email || "—"}</span>
               </td>
-              <td className="px-6 py-4">
-                <span className="px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">
+
+              <td className="px-5 py-3.5">
+                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
                   {calcularEdad(est.fecha_nacimiento)} años
                 </span>
               </td>
-              <td className="px-6 py-4">
-                <div className="flex gap-2">
+
+              <td className="px-5 py-3.5">
+                <div className="flex items-center gap-1.5">
+                  {/* View */}
                   <button
                     onClick={() => openModal("view", est)}
-                    className="px-3 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-all"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 transition-colors"
                   >
-                    Ver
+                    👁
                   </button>
+
+                  {/* Edit */}
                   <button
                     onClick={() => openModal("edit", est)}
-                    className="px-3 py-1.5 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold rounded-lg transition-all"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 transition-colors"
                   >
-                    Editar
+                    ✏️
                   </button>
+
+                  {/* Delete */}
                   <button
                     onClick={() => handleDelete(est.id)}
-                    className="px-3 py-1.5 text-xs bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded-lg transition-all"
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
                   >
-                    Eliminar
+                    🗑
                   </button>
                 </div>
               </td>
@@ -219,20 +283,20 @@ const Estudiantes = () => {
         onClose={closeModal}
         title={
           modal.mode === "add"
-            ? "Nuevo Estudiante"
+            ? "Nuevo estudiante"
             : modal.mode === "edit"
-              ? "Editar Estudiante"
-              : "Detalle del Estudiante"
+              ? "Editar estudiante"
+              : "Detalle del estudiante"
         }
         size="md"
       >
         {modal.mode === "view" && modal.data ? (
-          <div className="space-y-4 text-sm">
+          <div className="space-y-4">
             {[
               ["Nombre", modal.data.nombre],
               ["Apellido", modal.data.apellido],
               ["DNI", modal.data.dni],
-              ["Email", modal.data.email],
+              ["Email", modal.data.email || "—"],
               [
                 "Fecha nacimiento",
                 modal.data.fecha_nacimiento
@@ -245,93 +309,109 @@ const Estudiantes = () => {
             ].map(([label, value]) => (
               <div
                 key={label}
-                className="flex gap-4 py-3 border-b border-slate-100 last:border-0"
+                className="flex items-center justify-between py-3 border-b border-slate-100"
               >
-                <span className="w-36 text-slate-500 font-medium shrink-0">
+                <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
                   {label}
                 </span>
-                <span className="text-slate-800 font-semibold">{value}</span>
+
+                <span className="text-sm font-semibold text-slate-800">
+                  {value}
+                </span>
               </div>
             ))}
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Nombre *
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Nombre
                 </label>
+
                 <input
                   value={form.nombre}
                   onChange={(e) => setForm({ ...form, nombre: e.target.value })}
                   required
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  Apellido *
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  Apellido
                 </label>
+
                 <input
                   value={form.apellido}
                   onChange={(e) =>
                     setForm({ ...form, apellido: e.target.value })
                   }
                   required
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
-                  DNI *
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                  DNI
                 </label>
+
                 <input
                   value={form.dni}
                   onChange={(e) => setForm({ ...form, dni: e.target.value })}
                   required
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm font-mono text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
                 />
               </div>
+
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
                   Email
                 </label>
+
                 <input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
                 />
               </div>
             </div>
+
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">
-                Fecha de Nacimiento
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                Fecha de nacimiento
               </label>
+
               <input
                 type="date"
                 value={form.fecha_nacimiento}
                 onChange={(e) =>
-                  setForm({ ...form, fecha_nacimiento: e.target.value })
+                  setForm({
+                    ...form,
+                    fecha_nacimiento: e.target.value,
+                  })
                 }
-                className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
               />
             </div>
-            <div className="flex gap-3 pt-4 border-t border-slate-200">
+
+            <div className="pt-1">
               <button
                 type="submit"
-                className="flex-1 py-2.5 bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-lg transition-all"
+                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+                style={{ background: "#0f2a5e" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "#1e3a6e")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "#0f2a5e")
+                }
               >
-                {modal.mode === "add" ? "Crear Estudiante" : "Guardar Cambios"}
-              </button>
-              <button
-                type="button"
-                onClick={closeModal}
-                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-lg transition-all"
-              >
-                Cancelar
+                {modal.mode === "add" ? "Crear estudiante" : "Guardar cambios"}
               </button>
             </div>
           </form>

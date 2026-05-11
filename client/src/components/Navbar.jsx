@@ -1,13 +1,35 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Users,
+  BookOpen,
+  ClipboardList,
+} from "lucide-react";
 
 import logo from "../assets/LOGO-fcad.png";
 
 const links = [
-  { to: "/dashboard", label: "Dashboard", icon: "📊" },
-  { to: "/estudiantes", label: "Estudiantes", icon: "👨‍🎓" },
-  { to: "/cursos", label: "Cursos", icon: "📚" },
-  { to: "/inscripciones", label: "Inscripciones", icon: "📝" },
+  {
+    to: "/dashboard",
+    label: "Dashboard",
+    icon: <LayoutDashboard className="w-4 h-4" />,
+  },
+  {
+    to: "/estudiantes",
+    label: "Estudiantes",
+    icon: <Users className="w-4 h-4" />,
+  },
+  {
+    to: "/cursos",
+    label: "Cursos",
+    icon: <BookOpen className="w-4 h-4" />,
+  },
+  {
+    to: "/inscripciones",
+    label: "Inscripciones",
+    icon: <ClipboardList className="w-4 h-4" />,
+  },
 ];
 
 // ─── Subcomponente: ítem de navegación ───────────────────────────────────────

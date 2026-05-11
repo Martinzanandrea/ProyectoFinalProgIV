@@ -32,7 +32,7 @@ function App() {
 
   return (
     <Router>
-      <div className="flex-1">
+      <div className="flex min-h-screen">
         {/* Sidebar — solo cuando está autenticado */}
         {isAuthenticated && <Navbar onLogout={handleLogout} />}
 
@@ -40,7 +40,7 @@ function App() {
             md:ml-60 empuja el contenido a la derecha del sidebar en desktop
             mt-14 en mobile para no quedar tapado por el topbar */}
         <main
-          className={`flex-1 ${isAuthenticated ? "md:ml-30 mt-14 md:mt-0" : ""}`}
+          className={`flex-1 ${isAuthenticated ? "md:ml-60 mt-14 md:mt-0" : ""}`}
         >
           <Routes>
             <Route path="/" element={<Navigate to="/login" />} />

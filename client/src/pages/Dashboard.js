@@ -221,7 +221,7 @@ const Dashboard = () => {
 
   return (
     // ml-56 empuja el contenido para no quedar bajo el sidebar (w-56 del Navbar)
-    <div className="md:ml-56 min-h-screen bg-slate-50">
+    <div className="min-h-screen flex flex-col">
       {/* ── Page header ──────────────────────────────────────────────────── */}
       <div className="bg-white border-b border-slate-200 px-6 py-5">
         <div className="max-w-5xl mx-auto">
