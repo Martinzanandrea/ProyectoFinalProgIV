@@ -74,8 +74,8 @@ const IconBtn = ({ children, badge = false }) => (
 // ─── Componente principal ─────────────────────────────────────────────────────
 const Navbar = ({
   onLogout,
-  userName = "Admin",
-  userRole = "Administrador",
+  userName ,
+  userRole ,
 }) => {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);

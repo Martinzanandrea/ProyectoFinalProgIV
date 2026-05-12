@@ -7,19 +7,18 @@
 
 // Lo que se acepta al crear o editar un estudiante
 const toEstudianteInputDTO = (body) => ({
-  nombre: body.nombre,
+  nombres: body.nombres,
   apellido: body.apellido,
-  dni: body.dni,
+  documento: body.documento,
   email: body.email || null,
   fecha_nacimiento: body.fecha_nacimiento || null,
 });
-
 // Lo que se devuelve al front (oculta columnas internas como id_usuario_modificacion)
 const toEstudianteOutputDTO = (row) => ({
-  id: row.id_estudiante,
-  nombre: row.nombres,
+  id_estudiante: row.id_estudiante,
+  nombres: row.nombres,
   apellido: row.apellido,
-  dni: row.documento,
+  documento: row.documento,
   email: row.email,
   fecha_nacimiento: row.fecha_nacimiento,
   activo: row.activo,

@@ -17,8 +17,15 @@ router.get("/", async (req, res) => {
 
   try {
     const whereClause = search
-      ? `WHERE c.id_curso_estado != 4 AND (c.nombre ILIKE $3 OR c.descripcion ILIKE $3)`
+      ? `WHERE c.id_curso_estado != 4
+     AND (c.nombre ILIKE $3 OR c.descripcion ILIKE $3)`
       : `WHERE c.id_curso_estado != 4`;
+
+    const countWhereClause = search
+      ? `WHERE c.id_curso_estado != 4
+     AND (c.nombre ILIKE $1 OR c.descripcion ILIKE $1)`
+      : `WHERE c.id_curso_estado != 4`;
+
     const params = search ? [limit, offset, `%${search}%`] : [limit, offset];
 
     const [result, countResult] = await Promise.all([
@@ -34,7 +41,7 @@ router.get("/", async (req, res) => {
         params,
       ),
       pool.query(
-        `SELECT COUNT(*) FROM cursos c ${whereClause}`,
+        `SELECT COUNT(*) FROM cursos c ${countWhereClause}`,
         search ? [`%${search}%`] : [],
       ),
     ]);

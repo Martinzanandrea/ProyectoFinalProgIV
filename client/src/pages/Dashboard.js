@@ -223,17 +223,17 @@ const Dashboard = () => {
     // ml-56 empuja el contenido para no quedar bajo el sidebar (w-56 del Navbar)
     <div className="min-h-screen flex flex-col">
       {/* ── Page header ──────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200 px-6 py-5">
-        <div className="max-w-5xl mx-auto">
-          <h1 className="text-xl font-bold text-slate-800 leading-tight">
-            Dashboard
-          </h1>
+      <div style={{ background: "#0f2a5e" }} className="px-8 pt-8 pb-10">
+        <h1 className="text-2xl font-bold text-white tracking-tight">
+          Dashboard
+        </h1>
+        <div className="mt-1 flex items-center gap-2 text-white/80">
           <p className="text-slate-400 text-xs mt-0.5 capitalize">{today}</p>
         </div>
       </div>
 
       {/* ── Contenido ────────────────────────────────────────────────────── */}
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+      <div className="px-6 md:px-8 -mt-4 flex-1 pb-10 space-y-8">
         {/* Error banner */}
         {error && (
           <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-medium">
@@ -256,7 +256,7 @@ const Dashboard = () => {
 
         {/* Stats */}
         <section>
-          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
+          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mt-6">
             Resumen general
           </p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

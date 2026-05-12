@@ -29,12 +29,18 @@ function App() {
     localStorage.removeItem("user");
     setIsAuthenticated(false);
   };
-
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   return (
     <Router>
       <div className="flex min-h-screen">
         {/* Sidebar — solo cuando está autenticado */}
-        {isAuthenticated && <Navbar onLogout={handleLogout} />}
+        {isAuthenticated && (
+          <Navbar
+            onLogout={handleLogout}
+            userName={user.nombre || user.nombre_usuario || "Usuario"}
+            userRole={user.rol || "Administrador"}
+          />
+        )}
 
         {/* Contenido principal
             md:ml-60 empuja el contenido a la derecha del sidebar en desktop

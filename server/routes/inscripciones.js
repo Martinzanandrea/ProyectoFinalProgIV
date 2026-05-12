@@ -88,11 +88,9 @@ router.post("/", async (req, res) => {
     }
     if (toInt(cursoRes.rows[0].id_curso_estado) !== 2) {
       await client.query("ROLLBACK");
-      return res
-        .status(400)
-        .json({
-          error: "Las inscripciones no están habilitadas para este curso",
-        });
+      return res.status(400).json({
+        error: "Las inscripciones no están habilitadas para este curso",
+      });
     }
 
     const insCountRes = await client.query(
@@ -124,16 +122,30 @@ router.post("/", async (req, res) => {
 
     const insertRes = await client.query(
       `INSERT INTO inscripciones
-         (id_curso, id_estudiante, fecha_hora_inscripcion, id_inscripcion_estado, id_usuario_modificacion, fecha_hora_modificacion)
-       VALUES ($1, $2, COALESCE($3, NOW()), 1, $4, NOW())
-       RETURNING *`,
+     (id_curso, id_estudiante, fecha_hora_inscripcion, id_inscripcion_estado, id_usuario_modificacion, fecha_hora_modificacion)
+   VALUES ($1, $2, COALESCE($3, NOW()), 1, $4, NOW())
+   RETURNING id_inscripcion`,
       [dto.id_curso, dto.id_estudiante, dto.fecha_hora_inscripcion, usuarioId],
     );
 
+    const nuevaInscripcion = await client.query(
+      `SELECT i.*,
+          e.nombres  AS estudiante_nombre,
+          e.apellido AS estudiante_apellido,
+          c.nombre   AS curso_nombre
+   FROM inscripciones i
+   JOIN estudiantes e ON i.id_estudiante = e.id_estudiante
+   JOIN cursos c      ON i.id_curso = c.id_curso
+   WHERE i.id_inscripcion = $1`,
+      [insertRes.rows[0].id_inscripcion],
+    );
+
     await client.query("COMMIT");
-    return res
-      .status(201)
-      .json({ success: true, data: toInscripcionOutputDTO(insertRes.rows[0]) });
+
+    return res.status(201).json({
+      success: true,
+      data: toInscripcionOutputDTO(nuevaInscripcion.rows[0]),
+    });
   } catch (err) {
     await client.query("ROLLBACK");
     console.error("Error POST /api/inscripciones:", err.stack || err);

@@ -109,7 +109,7 @@ async function generarDiplomaPDF(res, { inscripcion, estudiante, curso }) {
     .fontSize(28)
     .fillColor("#1A252F")
     .font("Helvetica-Bold")
-    .text(`${estudiante.nombres} ${estudiante.apellido}`, margin, lineY + 55, {
+    .text(`${estudiante.nombre} ${estudiante.apellido}`, margin, lineY + 55, {
       align: "center",
       width: pageWidth - margin * 2,
     });
