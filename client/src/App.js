@@ -29,24 +29,21 @@ function App() {
     localStorage.removeItem("user");
     setIsAuthenticated(false);
   };
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
   return (
     <Router>
-      <div className="flex min-h-screen">
-        {/* Sidebar — solo cuando está autenticado */}
-        {isAuthenticated && (
-          <Navbar
-            onLogout={handleLogout}
-            userName={user.nombre || user.nombre_usuario || "Usuario"}
-            userRole={user.rol || "Administrador"}
-          />
-        )}
+      <div className="flex min-h-screen bg-slate-50">
+        {isAuthenticated && <Navbar onLogout={handleLogout} />}
 
-        {/* Contenido principal
-            md:ml-60 empuja el contenido a la derecha del sidebar en desktop
-            mt-14 en mobile para no quedar tapado por el topbar */}
+        {/*
+          Layout responsivo:
+          - Desktop (md+): sidebar fijo de 224px (w-56), contenido con ml-56
+          - Mobile: topbar fijo de 48px (h-12) + breadcrumb ~24px ≈ mt-16
+        */}
         <main
-          className={`flex-1 ${isAuthenticated ? "md:ml-60 mt-14 md:mt-0" : ""}`}
+          className={`flex-1 min-w-0 ${
+            isAuthenticated ? "md:ml-56 mt-16 md:mt-0" : ""
+          }`}
         >
           <Routes>
             <Route path="/" element={<Navigate to="/login" />} />

@@ -39,21 +39,23 @@ const InscripcionRow = ({
 
   return (
     <>
-      <td className="px-5 py-3.5 text-xs font-mono text-slate-400">
+      <td className="px-4 py-3 text-xs font-mono text-slate-400 whitespace-nowrap">
         #{inscripcion.id_inscripcion}
       </td>
-      <td className="px-5 py-3.5 text-sm font-semibold text-slate-800">
-        {inscripcion.estudiante_apellido}, {inscripcion.estudiante_nombre}
+      <td className="px-4 py-3 text-sm font-semibold text-slate-800 max-w-[160px]">
+        <span className="truncate block">
+          {inscripcion.estudiante_apellido}, {inscripcion.estudiante_nombre}
+        </span>
       </td>
-      <td className="px-5 py-3.5 text-sm text-slate-600 max-w-[200px]">
+      <td className="px-4 py-3 text-sm text-slate-600 max-w-[160px]">
         <span className="truncate block">{inscripcion.curso_nombre}</span>
       </td>
-      <td className="px-5 py-3.5 text-xs text-slate-400 whitespace-nowrap">
+      <td className="px-4 py-3 text-xs text-slate-400 whitespace-nowrap">
         {new Date(inscripcion.fecha_hora_inscripcion).toLocaleDateString(
           "es-AR",
         )}
       </td>
-      <td className="px-5 py-3.5">
+      <td className="px-4 py-3">
         {estado && (
           <span
             className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full ${estado.bg} ${estado.text}`}
@@ -63,9 +65,8 @@ const InscripcionRow = ({
           </span>
         )}
       </td>
-      <td className="px-5 py-3.5">
-        <div className="flex items-center gap-1.5">
-          {/* Ver detalle */}
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <button
             onClick={onView}
             title="Ver detalle"
@@ -94,7 +95,6 @@ const InscripcionRow = ({
 
           {!esCancelada && (
             <>
-              {/* Diploma */}
               <button
                 onClick={() => onDiploma(inscripcion.id_inscripcion)}
                 title="Descargar diploma"
@@ -114,7 +114,6 @@ const InscripcionRow = ({
                   />
                 </svg>
               </button>
-              {/* Cancelar */}
               <button
                 onClick={() => onCancelar(inscripcion.id_inscripcion)}
                 title="Cancelar inscripción"
@@ -166,7 +165,7 @@ const InscripcionRow = ({
 
 // ─── Formulario nueva inscripción ─────────────────────────────────────────────
 const InscripcionForm = ({ form, setForm, estudiantes, cursos, onSubmit }) => (
-  <form onSubmit={onSubmit} className="space-y-5">
+  <form onSubmit={onSubmit} className="space-y-4">
     <div className="grid sm:grid-cols-2 gap-4">
       <div>
         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
@@ -180,13 +179,12 @@ const InscripcionForm = ({ form, setForm, estudiantes, cursos, onSubmit }) => (
         >
           <option value="">Seleccionar estudiante...</option>
           {estudiantes.map((est) => (
-            <option key={est.id_estudiante} value={est.id_estudiante}>
-              {est.apellido}, {est.nombres} — {est.documento}
+            <option key={est.id} value={est.id}>
+              {est.apellido}, {est.nombre} — {est.dni}
             </option>
           ))}
         </select>
       </div>
-
       <div>
         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
           Curso abierto
@@ -207,7 +205,6 @@ const InscripcionForm = ({ form, setForm, estudiantes, cursos, onSubmit }) => (
         </select>
       </div>
     </div>
-
     <div>
       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
         Fecha de inscripción
@@ -224,7 +221,6 @@ const InscripcionForm = ({ form, setForm, estudiantes, cursos, onSubmit }) => (
         className="w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all bg-white"
       />
     </div>
-
     <div className="pt-1">
       <button
         type="submit"
@@ -243,41 +239,30 @@ const InscripcionForm = ({ form, setForm, estudiantes, cursos, onSubmit }) => (
 const InscripcionView = ({ inscripcion }) => {
   if (!inscripcion) return null;
   const estado = ESTADOS[inscripcion.id_inscripcion_estado];
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between py-3 border-b border-slate-100">
-        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-          ID
-        </span>
-        <span className="text-sm font-mono font-semibold text-slate-700">
-          #{inscripcion.id_inscripcion}
-        </span>
-      </div>
-      <div className="flex items-center justify-between py-3 border-b border-slate-100">
-        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-          Estudiante
-        </span>
-        <span className="text-sm font-semibold text-slate-800">
-          {inscripcion.estudiante_apellido}, {inscripcion.estudiante_nombre}
-        </span>
-      </div>
-      <div className="flex items-center justify-between py-3 border-b border-slate-100">
-        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-          Curso
-        </span>
-        <span className="text-sm font-semibold text-slate-800">
-          {inscripcion.curso_nombre}
-        </span>
-      </div>
-      <div className="flex items-center justify-between py-3 border-b border-slate-100">
-        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-          Fecha
-        </span>
-        <span className="text-sm text-slate-600">
-          {new Date(inscripcion.fecha_hora_inscripcion).toLocaleString("es-AR")}
-        </span>
-      </div>
+    <div className="space-y-0">
+      {[
+        ["ID", `#${inscripcion.id_inscripcion}`],
+        [
+          "Estudiante",
+          `${inscripcion.estudiante_apellido}, ${inscripcion.estudiante_nombre}`,
+        ],
+        ["Curso", inscripcion.curso_nombre],
+        [
+          "Fecha",
+          new Date(inscripcion.fecha_hora_inscripcion).toLocaleString("es-AR"),
+        ],
+      ].map(([label, value]) => (
+        <div
+          key={label}
+          className="flex items-center justify-between py-3 border-b border-slate-100"
+        >
+          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+            {label}
+          </span>
+          <span className="text-sm font-semibold text-slate-700">{value}</span>
+        </div>
+      ))}
       <div className="flex items-center justify-between py-3">
         <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
           Estado
@@ -298,6 +283,7 @@ const InscripcionView = ({ inscripcion }) => {
 // ─── Página principal ─────────────────────────────────────────────────────────
 const Inscripciones = () => {
   const [inscripciones, setInscripciones] = useState([]);
+  const [inscripcionesFiltradas, setInscripcionesFiltradas] = useState([]);
   const [estudiantes, setEstudiantes] = useState([]);
   const [cursos, setCursos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -308,6 +294,8 @@ const Inscripciones = () => {
     total: 0,
   });
   const [modal, setModal] = useState({ open: false, mode: "", data: null });
+  const [search, setSearch] = useState("");
+  const [filtroEstado, setFiltroEstado] = useState(""); // "" = todos, "1" = confirmadas, "2" = canceladas
   const [form, setForm] = useState({
     id_estudiante: "",
     id_curso: "",
@@ -345,6 +333,29 @@ const Inscripciones = () => {
   useEffect(() => {
     fetchInscripciones(page);
   }, [page, fetchInscripciones]);
+
+  // Filtro local por búsqueda y estado
+  useEffect(() => {
+    let result = [...inscripciones];
+
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (ins) =>
+          `${ins.estudiante_apellido} ${ins.estudiante_nombre}`
+            .toLowerCase()
+            .includes(q) || ins.curso_nombre?.toLowerCase().includes(q),
+      );
+    }
+
+    if (filtroEstado !== "") {
+      result = result.filter(
+        (ins) => ins.id_inscripcion_estado === Number(filtroEstado),
+      );
+    }
+
+    setInscripcionesFiltradas(result);
+  }, [inscripciones, search, filtroEstado]);
 
   const openModal = (mode, data = null) => {
     if (mode === "add") {
@@ -413,14 +424,25 @@ const Inscripciones = () => {
     }
   };
 
+  // Contadores para los chips de filtro
+  const totalConfirmadas = inscripciones.filter(
+    (i) => i.id_inscripcion_estado === 1,
+  ).length;
+  const totalCanceladas = inscripciones.filter(
+    (i) => i.id_inscripcion_estado === 2,
+  ).length;
+
   return (
     <div
       className="min-h-screen flex flex-col"
       style={{ background: "#f8fafc" }}
     >
       {/* Page header */}
-      <div style={{ background: "#0f2a5e" }} className="px-8 pt-8 pb-10">
-        <h1 className="text-2xl font-bold text-white tracking-tight">
+      <div
+        style={{ background: "#0f2a5e" }}
+        className="px-4 sm:px-8 pt-8 pb-10"
+      >
+        <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
           Inscripciones
         </h1>
         <p className="text-white/40 text-xs mt-1">
@@ -429,13 +451,48 @@ const Inscripciones = () => {
       </div>
 
       {/* Contenido */}
-      <div className="px-6 md:px-8 -mt-4 flex-1 pb-10 space-y-5">
-        {/* Barra de acciones */}
-        <div className="flex items-center justify-between">
-          <div /> {/* espacio para filtros futuros */}
+      <div className="px-4 sm:px-6 md:px-8 -mt-4 flex-1 pb-10 space-y-4">
+        {/* Barra búsqueda + filtros + acción */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          {/* Búsqueda */}
+          <div className="relative flex-1">
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+            <input
+              type="text"
+              placeholder="Buscar por estudiante o curso..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all"
+            />
+          </div>
+
+          {/* Filtro estado */}
+          <select
+            value={filtroEstado}
+            onChange={(e) => setFiltroEstado(e.target.value)}
+            className="px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all sm:w-48"
+          >
+            <option value="">Todos los estados</option>
+            <option value="1">Confirmadas ({totalConfirmadas})</option>
+            <option value="2">Canceladas ({totalCanceladas})</option>
+          </select>
+
+          {/* Botón nueva inscripción */}
           <button
             onClick={() => openModal("add")}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors whitespace-nowrap"
             style={{ background: "#0f2a5e" }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "#1e3a6e")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "#0f2a5e")}
@@ -457,10 +514,81 @@ const Inscripciones = () => {
           </button>
         </div>
 
+        {/* Chips de conteo rápido */}
+        <div className="flex flex-wrap gap-2">
+          {[
+            {
+              label: "Todas",
+              value: "",
+              count: inscripciones.length,
+              bg: "bg-slate-100",
+              text: "text-slate-600",
+            },
+            {
+              label: "Confirmadas",
+              value: "1",
+              count: totalConfirmadas,
+              bg: "bg-emerald-100",
+              text: "text-emerald-700",
+            },
+            {
+              label: "Canceladas",
+              value: "2",
+              count: totalCanceladas,
+              bg: "bg-red-100",
+              text: "text-red-600",
+            },
+          ].map((chip) => (
+            <button
+              key={chip.value}
+              onClick={() => setFiltroEstado(chip.value)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border-2
+                ${
+                  filtroEstado === chip.value
+                    ? `${chip.bg} ${chip.text} border-current`
+                    : "bg-white text-slate-400 border-slate-200 hover:border-slate-300"
+                }`}
+            >
+              {chip.label}
+              <span
+                className={`font-bold ${filtroEstado === chip.value ? chip.text : "text-slate-400"}`}
+              >
+                {chip.count}
+              </span>
+            </button>
+          ))}
+
+          {/* Indicador de filtro activo */}
+          {(search || filtroEstado) && (
+            <button
+              onClick={() => {
+                setSearch("");
+                setFiltroEstado("");
+              }}
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 border-2 border-amber-200 hover:bg-amber-100 transition-all"
+            >
+              <svg
+                className="w-3 h-3"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+
         {/* Tabla */}
         <DataTable
           columns={["#", "Estudiante", "Curso", "Fecha", "Estado", "Acciones"]}
-          data={inscripciones}
+          data={inscripcionesFiltradas}
           loading={loading}
           pagination={pagination}
           onPageChange={setPage}
