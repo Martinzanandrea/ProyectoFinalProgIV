@@ -52,7 +52,7 @@ router.get("/", async (req, res) => {
     const countResult = await pool.query(countQuery, countParams);
 
     res.json({
-      data: result.rows.map(toEstudianteOutputDTO), // Output DTO aplicado a cada fila
+      data: result.rows.map(toEstudianteOutputDTO),
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -67,7 +67,7 @@ router.get("/", async (req, res) => {
 
 // POST /api/estudiantes
 router.post("/", validateEstudiante, async (req, res) => {
-  const dto = toEstudianteInputDTO(req.body); // Input DTO: filtra campos permitidos
+  const dto = toEstudianteInputDTO(req.body);
   const usuarioId = req.user?.id;
   if (!usuarioId)
     return res.status(401).json({ error: "Usuario no autenticado" });
@@ -89,9 +89,9 @@ router.post("/", validateEstudiante, async (req, res) => {
        RETURNING *`,
       [
         nextId,
-        dto.nombre,
+        dto.nombres, // ✅ DTO usa "nombres"
         dto.apellido,
-        dto.dni,
+        dto.documento, // ✅ DTO usa "documento"
         dto.email,
         dto.fecha_nacimiento,
         usuarioId,
@@ -99,7 +99,7 @@ router.post("/", validateEstudiante, async (req, res) => {
     );
 
     await client.query("COMMIT");
-    res.json({ success: true, data: toEstudianteOutputDTO(result.rows[0]) }); // Output DTO
+    res.json({ success: true, data: toEstudianteOutputDTO(result.rows[0]) });
   } catch (err) {
     await client.query("ROLLBACK");
     res.status(500).json({ error: err.message });
@@ -118,7 +118,7 @@ router.get("/:id", async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Estudiante no encontrado" });
     }
-    res.json({ data: toEstudianteOutputDTO(result.rows[0]) }); // Output DTO
+    res.json({ data: toEstudianteOutputDTO(result.rows[0]) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -126,7 +126,7 @@ router.get("/:id", async (req, res) => {
 
 // PUT /api/estudiantes/:id
 router.put("/:id", validateEstudiante, async (req, res) => {
-  const dto = toEstudianteInputDTO(req.body); // Input DTO
+  const dto = toEstudianteInputDTO(req.body);
   const usuarioId = req.user?.id;
   if (!usuarioId)
     return res.status(401).json({ error: "Usuario no autenticado" });
@@ -144,9 +144,9 @@ router.put("/:id", validateEstudiante, async (req, res) => {
        WHERE id_estudiante = $7
        RETURNING *`,
       [
-        dto.nombre,
+        dto.nombres, // ✅ DTO usa "nombres"
         dto.apellido,
-        dto.dni,
+        dto.documento, // ✅ DTO usa "documento"
         dto.email,
         dto.fecha_nacimiento,
         usuarioId,
@@ -156,7 +156,7 @@ router.put("/:id", validateEstudiante, async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Estudiante no encontrado" });
     }
-    res.json({ success: true, data: toEstudianteOutputDTO(result.rows[0]) }); // Output DTO
+    res.json({ success: true, data: toEstudianteOutputDTO(result.rows[0]) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

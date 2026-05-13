@@ -8,10 +8,11 @@ import {
   deleteEstudiante,
 } from "../services/api";
 
+// Campos vacíos del form — usan los mismos nombres que el DTO input
 const FORM_EMPTY = {
-  nombre: "",
+  nombres: "",
   apellido: "",
-  dni: "",
+  documento: "",
   email: "",
   fecha_nacimiento: "",
 };
@@ -76,9 +77,9 @@ const Estudiantes = () => {
     setForm(
       data
         ? {
-            nombre: data.nombre || "",
+            nombres: data.nombres || "", // ✅ "nombres"
             apellido: data.apellido || "",
-            dni: data.dni || "",
+            documento: data.documento || "", // ✅ "documento"
             email: data.email || "",
             fecha_nacimiento: formatDateForInput(data.fecha_nacimiento),
           }
@@ -96,7 +97,8 @@ const Estudiantes = () => {
     e.preventDefault();
     try {
       if (modal.mode === "add") await createEstudiante(form);
-      if (modal.mode === "edit") await updateEstudiante(modal.data.id, form);
+      if (modal.mode === "edit")
+        await updateEstudiante(modal.data.id_estudiante, form); // ✅ "id_estudiante"
       closeModal();
       fetchEstudiantes(page, search);
     } catch (err) {
@@ -120,8 +122,11 @@ const Estudiantes = () => {
       style={{ background: "#f8fafc" }}
     >
       {/* Page header */}
-      <div style={{ background: "#0f2a5e" }} className="px-8 pt-8 pb-10">
-        <h1 className="text-2xl font-bold text-white tracking-tight">
+      <div
+        style={{ background: "#0f2a5e" }}
+        className="px-4 sm:px-8 pt-8 pb-10"
+      >
+        <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
           Estudiantes
         </h1>
         <p className="text-white/40 text-xs mt-1">
@@ -130,9 +135,9 @@ const Estudiantes = () => {
       </div>
 
       {/* Contenido */}
-      <div className="px-6 md:px-8 -mt-4 flex-1 pb-10 space-y-5">
+      <div className="px-4 sm:px-6 md:px-8 -mt-4 flex-1 pb-10 space-y-5">
         {/* Barra búsqueda + acción */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -157,7 +162,7 @@ const Estudiantes = () => {
               </svg>
               <input
                 type="text"
-                placeholder="Buscar por nombre, apellido o DNI..."
+                placeholder="Buscar por nombre, apellido o documento..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-lg text-sm bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400 transition-all"
@@ -173,7 +178,7 @@ const Estudiantes = () => {
 
           <button
             onClick={() => openModal("add")}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors flex-shrink-0"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold text-white transition-colors flex-shrink-0"
             style={{ background: "#0f2a5e" }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "#1e3a6e")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "#0f2a5e")}
@@ -197,7 +202,14 @@ const Estudiantes = () => {
 
         {/* Tabla */}
         <DataTable
-          columns={["#", "Estudiante", "DNI", "Email", "Edad", "Acciones"]}
+          columns={[
+            "#",
+            "Estudiante",
+            "Documento",
+            "Email",
+            "Edad",
+            "Acciones",
+          ]}
           data={estudiantes}
           loading={loading}
           pagination={pagination}
@@ -206,13 +218,13 @@ const Estudiantes = () => {
           {(est) => (
             <>
               <td className="px-5 py-3.5 text-xs font-mono text-slate-400">
-                #{est.id}
+                #{est.id_estudiante} {/* ✅ id_estudiante */}
               </td>
               <td className="px-5 py-3.5 text-sm font-semibold text-slate-800">
-                {est.apellido}, {est.nombre}
+                {est.apellido}, {est.nombres} {/* ✅ nombres */}
               </td>
               <td className="px-5 py-3.5 text-sm font-mono text-slate-500">
-                {est.dni}
+                {est.documento} {/* ✅ documento */}
               </td>
               <td className="px-5 py-3.5 text-sm text-slate-400 max-w-[200px]">
                 <span className="truncate block">{est.email || "—"}</span>
@@ -272,7 +284,7 @@ const Estudiantes = () => {
                   </button>
                   {/* Eliminar */}
                   <button
-                    onClick={() => handleDelete(est.id)}
+                    onClick={() => handleDelete(est.id_estudiante)}
                     title="Eliminar"
                     className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-red-100 text-slate-400 hover:text-red-500 transition-colors"
                   >
@@ -314,9 +326,9 @@ const Estudiantes = () => {
           /* Vista detalle */
           <div className="space-y-0">
             {[
-              ["Nombre", modal.data.nombre],
+              ["Nombres", modal.data.nombres], // ✅ nombres
               ["Apellido", modal.data.apellido],
-              ["DNI", modal.data.dni],
+              ["Documento", modal.data.documento], // ✅ documento
               ["Email", modal.data.email || "—"],
               [
                 "Fecha nacimiento",
@@ -345,13 +357,15 @@ const Estudiantes = () => {
           /* Formulario add/edit */
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
-              <Field label="Nombre" required>
+              <Field label="Nombres" required>
                 <input
-                  value={form.nombre}
-                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                  value={form.nombres}
+                  onChange={(e) =>
+                    setForm({ ...form, nombres: e.target.value })
+                  } // ✅ nombres
                   required
                   className={inputCls}
-                  placeholder="Ej: María"
+                  placeholder="Ej: María José"
                 />
               </Field>
               <Field label="Apellido" required>
@@ -368,10 +382,12 @@ const Estudiantes = () => {
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
-              <Field label="DNI" required>
+              <Field label="Documento" required>
                 <input
-                  value={form.dni}
-                  onChange={(e) => setForm({ ...form, dni: e.target.value })}
+                  value={form.documento}
+                  onChange={(e) =>
+                    setForm({ ...form, documento: e.target.value })
+                  } // ✅ documento
                   required
                   className={`${inputCls} font-mono`}
                   placeholder="Ej: 30123456"
